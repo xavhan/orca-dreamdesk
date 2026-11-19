@@ -219,3 +219,24 @@ test('applyRequest: agents add items and act on them; bad requests throw', () =>
   assert.throws(() => Q.applyRequest(q, { op: 'set_pr', id: item.id, prUrl: 'https://evil.example/pull/1' }, 1))
   assert.throws(() => Q.applyRequest(q, { op: 'rm -rf' }, 1))
 })
+
+test('sink sends the top item to the bottom; new activity brings it back', () => {
+  const inc = (originId: string, importance: number) => ({ source: 'linear' as const, originId, type: 'ticket' as const, urgent: false, title: originId, summary: '', importance, at: 1 })
+  let q = Q.ingest(Q.emptyQueue(), [inc('A-1', 1), inc('A-2', 2), inc('A-3', 4)], 1)
+  q = Q.sink(q, 'linear:A-1', 5)
+  assert.deepEqual(Q.rank(q, 6).map((i) => i.id), ['linear:A-2', 'linear:A-3', 'linear:A-1'])
+  q = Q.ingest(q, [inc('A-1', 1)], 7)
+  assert.equal(Q.rank(q, 8)[0]!.id, 'linear:A-1')
+})
+
+test('status: need beats working beats waiting beats actionable', () => {
+  const base = Q.ingest(Q.emptyQueue(), [{ source: 'linear', originId: 'A-1', type: 'ticket', urgent: false, title: 't', summary: '', importance: 2, at: 1 }], 1).items['linear:A-1']!
+  assert.equal(Q.status(base), 'actionable')
+  assert.equal(Q.status({ ...base, importance: 4 }), 'idle')
+  assert.equal(Q.status(base, 'working'), 'working')
+  assert.equal(Q.status(base, 'done', { ci: 'running', awaitingReview: false }), 'waiting')
+  assert.equal(Q.status(base, 'done', { awaitingReview: true }), 'waiting')
+  assert.equal(Q.status(base, 'working', { ci: 'failing', awaitingReview: false }), 'need')
+  assert.equal(Q.status(base, 'permission'), 'need')
+  assert.equal(Q.status({ ...base, kind: 'urgent' }), 'need')
+})

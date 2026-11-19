@@ -79,6 +79,7 @@ export function setup(ctx: PanelContext): void {
     markSeen(v)
   }
   ctx.subscriptions.push(plugin.on('queue.changed', show))
+  ctx.subscriptions.push(plugin.on('blink', (on) => set(blinkOn, on)))
   void plugin.request('queue.get').then(show)
   void plugin.request('agents.all').then((a) => set(agents, a)).catch(() => {})
 }
@@ -150,6 +151,11 @@ function Message({ m, px = 24 }: { m: Msg; px?: number }) {
           <Text size="xs" muted><RelativeTime at={Number(m.ts) * 1000} /></Text>
         </Row>
         {m.text ? <Text size="sm">{m.text}</Text> : null}
+        {m.links?.length ? (
+          <Row gap="none" wrap>
+            {m.links.map((l) => <IconButton icon="link" label={`Open ${l.label}`} tooltip={l.url} size="sm" variant="ghost" onPress={() => shell.openExternal(l.url)} />)}
+          </Row>
+        ) : null}
         {m.files?.length ? (
           <Stack gap="xs">
             {m.files.map((f) =>
@@ -291,9 +297,21 @@ function Hero({ item, label, since, children }: { item: Item; label: string; sin
 }
 
 /** A queued item as one compact row. */
+// Border tones per status. Orca has no blue tone: accent (white in a dark theme) marks actionable.
+const BORDER = { need: 'danger', working: 'warning', waiting: 'warning', actionable: 'accent', idle: true } as const
+// Panels cannot animate: the worker sends `blink` every second while an agent works, and the
+// borders of those rows follow it.
+const blinkOn = atom(true)
+
 function QueueRow({ item, badge }: { item: Item; badge?: string }) {
+  const v = read(view)
+  const st = v?.status?.[item.id] ?? 'actionable'
+  const border = st === 'working' && !read(blinkOn) ? true : BORDER[st]
+  // Its worktree is the one open in Orca: a thick green strip on the left. Box tints are too faint
+  // in dark themes and Box has no one-sided border; a coloured half-block character shows clearly.
   return (
-    <Box direction="row" align="center" gap="sm" paddingX="sm" paddingY="xs" radius="md" border={item.kind === 'urgent' ? 'danger' : true}>
+    <Box direction="row" align="center" gap="sm" paddingX="sm" paddingY="xs" radius="md" border={border}>
+      {v?.here === item.id ? <Text size="md" tone="success">▌</Text> : null}
       <Icon src={LOGO[item.source]} alt={SOURCE[item.source]} />
       <Box direction="column" grow minWidth={0}>
         <Text size="sm" weight="medium" truncate>{item.title}</Text>
@@ -301,7 +319,6 @@ function QueueRow({ item, badge }: { item: Item; badge?: string }) {
       </Box>
       <People item={item} names={false} max={2} />
       {badge ? <Badge>{badge}</Badge> : <Priority item={item} />}
-      {read(view)?.here === item.id ? <Badge tone="accent">You're here</Badge> : null}
       <WorktreeChip item={item} compact />
       <IconButton icon="close" label={`Dismiss ${item.title}`} tooltip="Dismiss: not relevant to me" size="sm" variant="ghost" onPress={() => act('pass', { id: item.id })} />
       <IconButton icon="play" label={`Take ${item.title}`} tooltip="Take" size="sm" tone="accent" onPress={() => take(item)} />
@@ -638,11 +655,16 @@ export default function Panel() {
         {v.current && v.focus ? <Current item={v.current} since={v.focus.since} /> : null}
 
         {v.focus && !v.current ? (
-          <Box border radius="md" padding="sm" justify="between" align="center">
-            <Text muted>
-              On something else since <RelativeTime at={v.focus.since} />
-            </Text>
-            <Button onPress={() => act('release')}>Done with it</Button>
+          <Box direction="row" border radius="md" paddingX="md" paddingY="sm" gap="sm" align="center">
+            <Spinner label="On something else" labelHidden />
+            <Stack gap="none">
+              <Text size="sm" weight="semibold">On something else</Text>
+              <Text size="xs" muted>
+                Shield up since <RelativeTime at={v.focus.since} />
+              </Text>
+            </Stack>
+            <Box grow />
+            <Button size="sm" variant="outline" icon="check" tooltip="Back to the queue" onPress={() => act('release')}>I'm done</Button>
           </Box>
         ) : null}
 
@@ -652,8 +674,21 @@ export default function Panel() {
               <Hero item={first} label="NEXT UP">
                 <Row gap="xs">
                   <Button variant="solid" tone={first.kind === 'urgent' ? 'danger' : 'accent'} icon="play" onPress={() => take(first)}>Take it</Button>
+                  {rest.length ? <Button variant="ghost" icon="next" tooltip="Send it to the bottom of the queue" onPress={() => act('sink', { id: first.id })}>Move to bottom</Button> : null}
                   <Button variant="ghost" icon="close" tooltip="Not relevant to me" onPress={() => act('pass', { id: first.id })}>Dismiss</Button>
                 </Row>
+                {rest.length ? (
+                  <Select
+                    label="Take another task"
+                    labelHidden
+                    placeholder="Take another task…"
+                    options={rest.map((i) => ({ value: i.id, label: i.title }))}
+                    onChange={(id) => {
+                      const pick = rest.find((i) => i.id === id)
+                      if (pick) void take(pick)
+                    }}
+                  />
+                ) : null}
               </Hero>
             ) : (
               <EmptyState title="Nothing to handle" description="Shield is down, enjoy." icon="check" />

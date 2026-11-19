@@ -26,6 +26,8 @@ export interface Item {
   delegatedTo?: string
   /** Waiting on a worktree: its last seen status, to resurface on a change to needs-you. */
   waitFrom?: string
+  /** Sent to the bottom of the queue at this time; cleared by new activity (ingest rebuilds the item). */
+  sunkAt?: number
   /** Slack only: latest thread messages, oldest first, and the newest ts already seen. */
   thread?: Msg[]
   seenTs?: string
@@ -50,6 +52,8 @@ export interface Msg {
   mine: boolean
   /** Plugin-relative avatar file, when downloaded. */
   avatar?: string
+  /** Links in the text, opened from small link buttons (the text shows labels or hosts only). */
+  links?: { url: string; label: string }[]
   /** Channel feed only: reply count of a thread root. */
   replies?: number
   /** Attachments: a link to open in Slack and, for images, local thumbnail files. */
@@ -133,6 +137,7 @@ export function ingest(q: Queue, incoming: readonly Incoming[], now: number): Qu
       q = put(q, {
         ...fresh,
         prUrl: fresh.prUrl ?? prev.prUrl,
+        ...(keep && prev.sunkAt ? { sunkAt: prev.sunkAt } : {}),
         arrivedAt: keep ? prev.arrivedAt : fresh.arrivedAt,
         state: keep ? prev.state : 'new',
         delegatedTo: prev.delegatedTo,
@@ -186,6 +191,7 @@ export function rank(q: Queue, now: number): Item[] {
     .filter((i) => visible(i, now))
     .sort(
       (a, b) =>
+        (a.sunkAt ?? 0) - (b.sunkAt ?? 0) ||
         KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
         importance(a) - importance(b) ||
         a.arrivedAt - b.arrivedAt
@@ -212,6 +218,11 @@ export function take(q: Queue, id: string, now: number): Queue {
 function leave(q: Queue, id: string, changes: Partial<Item>): Queue {
   q = patch(q, id, changes)
   return q.focus?.itemId === id ? { ...q, focus: null } : q
+}
+
+/** Send an item to the bottom of the queue, below everything not sunk before it. */
+export function sink(q: Queue, id: string, now: number): Queue {
+  return patch(q, id, { sunkAt: now })
 }
 
 export function pass(q: Queue, id: string): Queue {
@@ -374,12 +385,25 @@ export function prSettled(pr: PrInfo, me: string): boolean {
 
 /** CI of a PR from gh's `statusCheckRollup` (check runs have status/conclusion, commit statuses
  *  have state): failing beats running beats passed; no checks → undefined. */
-export function ciState(checks: readonly { status?: string; conclusion?: string; state?: string }[]): 'running' | 'failing' | 'passed' | undefined {
+export type CiState = 'running' | 'failing' | 'passed'
+export function ciState(checks: readonly { status?: string; conclusion?: string; state?: string }[]): CiState | undefined {
   if (!checks.length) return undefined
   const bad = ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE']
   if (checks.some((c) => bad.includes(c.conclusion ?? '') || bad.includes(c.state ?? ''))) return 'failing'
   if (checks.some((c) => (c.status && c.status !== 'COMPLETED') || c.state === 'PENDING' || c.state === 'EXPECTED')) return 'running'
   return 'passed'
+}
+
+/** What a row's border says: red needs you, orange blinking an agent works, orange waits on
+ *  CI or a review, white is yours to act on, none is idle (info only, snoozed). */
+export type Status = 'need' | 'working' | 'waiting' | 'actionable' | 'idle'
+
+export function status(item: Item, worktree?: string, pr?: { ci?: CiState; awaitingReview: boolean }): Status {
+  if (item.kind === 'urgent' || item.source === 'agent' || worktree === 'permission' || pr?.ci === 'failing') return 'need'
+  if (worktree === 'working') return 'working'
+  if (pr?.ci === 'running' || pr?.awaitingReview || item.state === 'delegated') return 'waiting'
+  if (importance(item) === 4 || item.state === 'snoozed') return 'idle'
+  return 'actionable'
 }
 
 // Slack ids and links. Pure, so the panel can import them (it cannot load node: modules).

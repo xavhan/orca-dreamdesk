@@ -1,5 +1,5 @@
 import { assert, test } from 'orca/testing'
-import { downloadThumbs, parseOrigin, plainLinks, readChannel, readThread, reply, threadLink } from './slack'
+import { downloadThumbs, links, parseOrigin, plainLinks, readChannel, readThread, reply, threadLink } from './slack'
 
 function fakeFetch(answers: Record<string, unknown>, seen: { method: string; body: string }[] = []) {
   return (async (url: string, init: { body: string }) => {
@@ -56,7 +56,7 @@ test('readChannel keeps real messages, oldest first, with reply counts', async (
 })
 
 test('plainLinks turns Slack markup into readable text', () => {
-  assert.equal(plainLinks('see <https://fal.ai/x|fal> and <https://a.b> in <#C1|eng> <!here> &amp; co'), 'see fal and https://a.b in #eng @here & co')
+  assert.equal(plainLinks('see <https://fal.ai/x|fal> and <https://a.b> <https://c.d/e|https://c.d/e> in <#C1|eng> <!here> &amp; co'), 'see fal and a.b c.d in #eng @here & co')
 })
 
 test('downloadThumbs saves image thumbnails with the token and drops the private URLs', async () => {
@@ -73,4 +73,11 @@ test('downloadThumbs saves image thumbnails with the token and drops the private
   assert.deepEqual(m!.files, [{ id: 'F1', name: 'a.png', url: 'u', image: true, thumb: 'media/F1-64.png', preview: 'media/F1-360.png' }])
   assert.deepEqual(auth, ['Bearer tok', 'Bearer tok'])
   assert.ok(existsSync(join(dir, 'F1-64.png')))
+})
+
+test('links lists the URLs of a message once, with their labels', () => {
+  assert.deepEqual(links('see <https://fal.ai/x|fal>, <https://a.b/?q=1&amp;r=2> and <https://fal.ai/x|again> <#C1|eng>'), [
+    { url: 'https://fal.ai/x', label: 'fal' },
+    { url: 'https://a.b/?q=1&r=2', label: 'https://a.b/?q=1&r=2' }
+  ])
 })

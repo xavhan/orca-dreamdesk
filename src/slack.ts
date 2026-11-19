@@ -59,6 +59,7 @@ async function toMsg(m: any, me: string, who: Who): Promise<Msg> {
     who: p.name,
     ...(p.avatar ? { avatar: p.avatar } : {}),
     text: await mentionsToNames(String(m.text ?? ''), who),
+    ...(links(String(m.text ?? '')).length ? { links: links(String(m.text ?? '')) } : {}),
     ts: String(m.ts),
     mine: m.user === me,
     ...(m.reply_count ? { replies: m.reply_count } : {}),
@@ -106,11 +107,29 @@ export async function post(token: string, channel: string, text: string, f: Fetc
   await call(token, 'chat.postMessage', { channel, text }, f)
 }
 
-/** Slack markup → plain text: `<url|label>` → label, `<url>` → url, `<#C1|name>` → #name, `<!here>` → @here. */
+/** The links of a Slack message, in order, deduplicated: `<url|label>` and bare `<url>`. */
+export function links(text: string): { url: string; label: string }[] {
+  const seen = new Map<string, string>()
+  for (const m of text.matchAll(/<(https?:[^|>]+)(?:\|([^>]+))?>/g)) if (!seen.has(m[1]!)) seen.set(m[1]!, m[2] ?? m[1]!)
+  const decode = (t: string) => t.replace(/&amp;/g, '&')
+  return [...seen].map(([url, label]) => ({ url: decode(url), label: decode(label) }))
+}
+
+/** A bare URL shortened to its host, for the message text; the link button opens the full URL. */
+const host = (url: string) => {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
+}
+
+/** Slack markup → plain text: `<url|label>` → label, `<url>` → its host, `<#C1|name>` → #name, `<!here>` → @here. */
 export function plainLinks(text: string): string {
   return text
-    .replace(/<(https?:[^|>]+)\|([^>]+)>/g, '$2')
-    .replace(/<(https?:[^>]+)>/g, '$1')
+    // Pasted links come as <url|url>: show the host, as for a bare <url>.
+    .replace(/<(https?:[^|>]+)\|([^>]+)>/g, (_, url: string, label: string) => (/^https?:/.test(label) ? host(url) : label))
+    .replace(/<(https?:[^>]+)>/g, (_, url: string) => host(url))
     .replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1')
     .replace(/<!(here|channel|everyone)>/g, '@$1')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')

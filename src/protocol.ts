@@ -1,8 +1,8 @@
 // The panel <-> worker contract, declared once: src/panel.tsx and src/worker.ts both read it.
-import type { Item, Msg, Queue } from './queue'
+import type { Item, Msg, Queue, Status } from './queue'
 import type { Meeting } from './calendar'
 
-export type Action = 'take' | 'done' | 'pass' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
+export type Action = 'take' | 'done' | 'pass' | 'sink' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
 
 export interface View {
   focus: Queue['focus']
@@ -25,6 +25,8 @@ export interface View {
   meetings?: (Meeting & { status: 'past' | 'now' | 'upcoming' })[]
   /** CI of the current item's PR (its PR link, else its worktree's branch), polled every minute. */
   ci?: { state: 'running' | 'failing' | 'passed'; url: string }
+  /** Item id → what its row border shows (see `Q.status`). */
+  status?: Record<string, Status>
   /** Queued item whose worktree is the one focused in Orca, when that is not the current item's. */
   here?: string
   /** Item id → Orca worktree linked to it (via `orca reference find`) and its agent status. */
@@ -84,5 +86,7 @@ declare module 'orca' {
   }
   interface PluginPanelEvents {
     'queue.changed': View
+    /** Toggles every second while a row's agent works, to blink its border. */
+    blink: boolean
   }
 }

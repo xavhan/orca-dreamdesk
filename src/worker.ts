@@ -197,8 +197,12 @@ export default function activate(orca: OrcaWorkerApi): void {
         worktrees,
         calendar: !!calendar,
         ...(here() ? { here: here() } : {}),
-        // Only for the item it was polled for: focus may have moved since.
-        ...(ci && ci.itemId === q.focus?.itemId ? { ci: { state: ci.state, url: ci.url } } : {}),
+        ...(q.focus?.itemId && prs[q.focus.itemId]?.ci ? { ci: { state: prs[q.focus.itemId]!.ci!, url: `${prs[q.focus.itemId]!.url}/checks` } } : {}),
+        status: Object.fromEntries(
+          Object.values(q.items)
+            .filter((i) => i.state !== 'done' && i.state !== 'passed')
+            .map((i) => [i.id, Q.status(i, worktrees[i.id]?.state, prs[i.id])])
+        ),
         ...(PERMACONF ? { permaconf: PERMACONF } : {}),
         nowAt: Date.now(),
         meetings: meetings(Date.now()),
@@ -309,10 +313,8 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   async function commit(next: Q.Queue, pierced: Q.Item[] = []): Promise<View> {
     // Round-trip through JSON: storage refuses `undefined` fields.
-    const focusMoved = next.focus?.itemId !== q.focus?.itemId
     q = JSON.parse(JSON.stringify(Q.prune(next, Date.now())))
     writeSnapshot()
-    if (focusMoved) void pollCi()
     await orca.storage.set(KEY, q as never)
     const v = view()
     orca.panels.post('queue.changed', v)
@@ -341,11 +343,14 @@ export default function activate(orca: OrcaWorkerApi): void {
     run('gh', args, { timeout: 15_000, cwd, env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` } })
   let ghLogin = ''
 
-  /** Closes PR items once the PR is merged, closed or reviewed (see `Q.prSettled`).
-   *  ponytail: one gh call per open PR item per minute; batch through GraphQL if that gets slow. */
-  async function pollPrs(): Promise<void> {
-    const open = Object.values(q.items).filter((i) => i.prUrl && i.state !== 'done')
-    if (!open.length) return
+  /** GitHub state of each open item's PR (its PR link, else its worktree's branch): CI and review. */
+  let prs: Record<string, { url: string; ci?: Q.CiState; awaitingReview: boolean }> = {}
+
+  /** One gh call per open item with a PR link or a worktree. Closes PR items once merged, closed or
+   *  reviewed (`Q.prSettled`). ponytail: N calls a minute; batch through GraphQL if that gets slow. */
+  async function pollGithub(): Promise<void> {
+    const open = Object.values(q.items).filter((i) => i.state !== 'done' && i.state !== 'passed' && (i.prUrl || worktrees[i.id]))
+    if (!open.length) return void (prs = {})
     try {
       ghLogin ||= (await gh(['api', 'user', '--jq', '.login'])).stdout.trim()
     } catch (err) {
@@ -353,45 +358,34 @@ export default function activate(orca: OrcaWorkerApi): void {
       refErrors.add('gh')
       return
     }
+    const found: typeof prs = {}
     const settled: string[] = []
     for (const item of open) {
+      const dir = worktrees[item.id]?.id.split('::')[1]
       try {
-        const pr = JSON.parse((await gh(['pr', 'view', item.prUrl!, '--json', 'state,author,reviews'])).stdout)
+        const args = ['pr', 'view', ...(item.prUrl ? [item.prUrl] : []), '--json', 'url,state,author,reviews,statusCheckRollup']
+        const pr = JSON.parse((await gh(args, item.prUrl ? undefined : dir)).stdout)
         const info: Q.PrInfo = {
           state: pr.state,
           author: pr.author?.login ?? '',
           reviewers: (pr.reviews ?? []).filter((r: any) => r.state !== 'PENDING').map((r: any) => r.author?.login ?? '')
         }
-        if (Q.prSettled(info, ghLogin)) settled.push(item.id)
+        if (item.prUrl && Q.prSettled(info, ghLogin)) settled.push(item.id)
+        found[item.id] = {
+          url: pr.url,
+          ...(Q.ciState(pr.statusCheckRollup ?? []) ? { ci: Q.ciState(pr.statusCheckRollup ?? []) } : {}),
+          awaitingReview: info.state === 'OPEN' && info.author === ghLogin && !info.reviewers.some((r) => r !== ghLogin)
+        }
       } catch (err) {
-        if (!refErrors.has(item.prUrl!)) orca.log(`prs: ${item.prUrl} ${String(err).slice(0, 200)}`)
-        refErrors.add(item.prUrl!)
+        // A worktree branch without a PR is normal; only log failing PR links, once.
+        if (item.prUrl && !refErrors.has(item.prUrl)) orca.log(`prs: ${item.prUrl} ${String(err).slice(0, 200)}`)
+        if (item.prUrl) refErrors.add(item.prUrl)
       }
     }
+    prs = found
     // Applied to the queue as it is now: the user may have acted during the gh calls.
     if (settled.length) await commit(settled.reduce((acc, id) => Q.done(acc, id), q))
-  }
-
-  let ci: (NonNullable<View['ci']> & { itemId: string }) | undefined
-  /** CI of the focused item's PR: from its PR link, else from its worktree's current branch. */
-  async function pollCi(): Promise<void> {
-    const item = q.focus?.itemId ? q.items[q.focus.itemId] : undefined
-    const dir = item && worktrees[item.id]?.id.split('::')[1]
-    let next: typeof ci
-    if (item?.prUrl || dir) {
-      try {
-        const args = ['pr', 'view', ...(item!.prUrl ? [item!.prUrl] : []), '--json', 'url,statusCheckRollup']
-        const pr = JSON.parse((await gh(args, item!.prUrl ? undefined : dir)).stdout)
-        const state = Q.ciState(pr.statusCheckRollup ?? [])
-        if (state) next = { itemId: item!.id, state, url: `${pr.url}/checks` }
-      } catch {
-        // No PR for this branch yet, or gh unavailable: no indicator.
-      }
-    }
-    if (JSON.stringify(next) !== JSON.stringify(ci)) {
-      ci = next
-      orca.panels.post('queue.changed', view())
-    }
+    else orca.panels.post('queue.changed', view())
   }
 
   /** What the MCP server shows other agents: open items, with their linked worktree. */
@@ -633,6 +627,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       case 'take': return commit(Q.take(q, need(id, 'id'), now))
       case 'done': return commit(Q.done(q, need(id, 'id')))
       case 'pass': return commit(Q.pass(q, need(id, 'id')))
+      case 'sink': return commit(Q.sink(q, need(id, 'id'), now))
       case 'wait': {
         const wt = worktrees[need(id, 'id')]
         if (!wt) throw Object.assign(new Error('no linked worktree'), { code: 'invalid_params' })
@@ -666,10 +661,12 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   // The status bar item keeps this worker alive, so plain timers are enough.
   const tick = setInterval(
-    () => void applyRequests().then(ingestInbox).then(pollThreads).then(pollChannel).then(pollPrs).then(pollWorktrees).then(pollCi).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
+    () => void applyRequests().then(ingestInbox).then(pollThreads).then(pollChannel).then(pollWorktrees).then(pollGithub).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
     60_000
   )
+  let rowBlink = false
   const blinker = setInterval(() => {
+    if (Object.values(worktrees).some((w) => w.state === 'working')) orca.panels.post('blink', (rowBlink = !rowBlink))
     if (!q.alert) return
     blink = !blink
     void statusBar(view())
