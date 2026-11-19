@@ -721,7 +721,9 @@ export default function Panel() {
             ) : (
               <EmptyState title="Nothing to handle" description="Shield is down, enjoy." icon="check" />
             )}
-            <Button variant="ghost" icon="pause" onPress={() => act('other')}>Working on something else</Button>
+            <Row justify="center">
+              <Button size="sm" variant="outline" icon="pause" tooltip="Raise the shield without taking an item from the queue" onPress={() => act('other')}>Working on something else</Button>
+            </Row>
           </Stack>
         ) : null}
 
