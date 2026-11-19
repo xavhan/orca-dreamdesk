@@ -354,6 +354,9 @@ function Current({ item, since }: { item: Item; since: number }) {
       <Row gap="xs" align="center" justify="between" wrap>
         <Row gap="xs" align="center">
           <Button variant="solid" tone="success" icon="check" onPress={() => act('done', { id: item.id })}>Done</Button>
+          {item.prUrl ? (
+            <Button variant="outline" icon="code" tooltip={`Open ${item.prUrl.replace('https://github.com/', '')} on GitHub`} onPress={() => shell.openExternal(item.prUrl!)}>Open PR</Button>
+          ) : null}
           {hasWorktree ? (
             <Button variant="outline" tone="accent" icon="branch" tooltip="Park it until the worktree agent needs you, and take the next item" onPress={() => act('wait', { id: item.id })}>Wait on worktree</Button>
           ) : null}

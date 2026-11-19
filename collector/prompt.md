@@ -22,6 +22,8 @@ Linear:
 - Issues assigned to the user that are new or changed.
 - Comments on their issues, and comments that mention them.
 
+Skip a review request whose PR `get_diff` shows as merged or closed.
+
 Skip messages written by the user, and bot messages unless they report a production incident.
 
 ## 3. Sort each entry
@@ -39,7 +41,7 @@ Skip messages written by the user, and bot messages unless they report a product
   - 2: assigned to them and active (In Progress, In Review, recent comments), or a teammate needs their input soon;
   - 3: normal work, no one waiting;
   - 4: information only (ticket moved to Done, FYI messages, nothing to do).
-- `prUrl`: when the entry is about a GitHub pull request (a review request, a Linear issue in review, a message linking a PR), the PR's `https://github.com/<owner>/<repo>/pull/<n>` URL. For Linear issues, take it from the issue's attachments. Leave it out otherwise. DreamDesk uses it to clear the entry once the PR is merged, closed or reviewed.
+- `prUrl`: when the entry is about a GitHub pull request (a review request, a Linear issue in review, a message linking a PR), the PR's `https://github.com/<owner>/<repo>/pull/<n>` URL. For a Linear review (a `linear.app/<team>/review/…` link), call Linear's `get_diff` with that link and use its `url`. For a Linear issue, take it from the issue's attachments. Leave it out otherwise. DreamDesk uses it to clear the entry once the PR is merged, closed or reviewed.
 - `people`: full names of the people involved, as shown in Slack or Linear (message authors, ticket creator, assignee, commenters), the user excluded, at most 4.
 
 ## 4. Write
