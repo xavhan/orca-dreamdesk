@@ -98,8 +98,26 @@ function Icon({ src, alt, px = 16, round = false }: { src: string; alt: string; 
   )
 }
 
+/** Clicking someone's avatar opens a direct conversation with them in the TEAM section. */
 function Avatar({ name, src, px = 20 }: { name: string; src?: string; px?: number }) {
   return src ? <Icon src={src} alt={name} px={px} round /> : <Badge>{initials(name)}</Badge>
+}
+
+/** A person's name; clicking it opens a direct conversation in the TEAM section. Not the avatar:
+ *  Orca refuses an image inside a Link or Button ("a layout Orca cannot show"). */
+function Who({ name, mine = false }: { name: string; mine?: boolean }) {
+  return mine || !read(view)?.slack ? <Text size="xs" weight="semibold" tone={mine ? 'accent' : undefined}>{name}</Text> : <Link onPress={() => openDm(name)}>{name}</Link>
+}
+
+async function openDm(name: string) {
+  try {
+    const { view: v, id } = await plugin.request('dm.open', { name })
+    set(view, v)
+    set(channelTab, id)
+    set(sendError, null)
+  } catch (err) {
+    set(sendError, err instanceof Error ? err.message : String(err))
+  }
 }
 
 /** People involved: Slack thread authors, then the names the collector gave, with avatars when known. */
@@ -117,7 +135,7 @@ function People({ item, names = true, max = 4 }: { item: Item; names?: boolean; 
   return (
     <Row gap="xs" align="center">
       {list.map(([name, src]) => <Avatar name={name} src={src} />)}
-      {names ? <Text size="xs" muted truncate>{list.map(([name]) => name).join(', ')}</Text> : null}
+      {names ? list.map(([name]) => <Who name={name} />) : null}
     </Row>
   )
 }
@@ -128,7 +146,7 @@ function Message({ m, px = 24 }: { m: Msg; px?: number }) {
       <Avatar name={m.who} src={m.avatar} px={px} />
       <Stack gap="none">
         <Row gap="xs" align="center">
-          <Text size="xs" weight="semibold" tone={m.mine ? 'accent' : undefined}>{m.who}</Text>
+          <Who name={m.who} mine={m.mine} />
           <Text size="xs" muted><RelativeTime at={Number(m.ts) * 1000} /></Text>
         </Row>
         {m.text ? <Text size="sm">{m.text}</Text> : null}
@@ -527,10 +545,11 @@ function Channels({ tabs }: { tabs: TeamTab[] }) {
       <Row justify="between" align="center">
         <Text size="xs" weight="semibold" muted>TEAM</Text>
         <Row gap="xs" align="center">
-          {current.ts ? <IconButton icon="close" label="Close thread tab" tooltip="Close this thread tab" size="sm" variant="ghost" onPress={() => closeThreadTab(current.id)} /> : null}
+          {current.ts || current.dm ? <IconButton icon="close" label="Close tab" tooltip="Close this tab" size="sm" variant="ghost" onPress={() => closeThreadTab(current.id)} /> : null}
           <IconButton icon="open-external" label="Open in Slack" tooltip="Open in Slack" size="sm" variant="ghost" onPress={() => shell.openExternal(current.url)} />
         </Row>
       </Row>
+      {read(sendError) ? <Text size="xs" tone="danger">{read(sendError)}</Text> : null}
       <Tabs
         label="Team channels"
         value={current.id}

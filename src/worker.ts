@@ -92,6 +92,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   const channelMsgs: Record<string, Q.Msg[]> = {}
   /** Threads opened as tabs, persisted; their messages are kept in `channelMsgs` by tab id. */
   let pinned: { channel: string; ts: string; title: string }[] = []
+  let dms: { channel: string; name: string }[] = []
   const tabId = (t: { channel: string; ts: string }) => `${t.channel}:${t.ts}`
   /** Collector names (Linear people) → avatar file, filled from the Slack directory. */
   const avatarByName: Record<string, string> = {}
@@ -206,7 +207,8 @@ export default function activate(orca: OrcaWorkerApi): void {
                 ts: t.ts,
                 url: `${slack!.url}archives/${t.channel}/p${t.ts.replace('.', '')}`,
                 messages: channelMsgs[tabId(t)] ?? []
-              }))
+              })),
+              ...dms.map((d) => ({ id: d.channel, name: `@${d.name}`, channel: d.channel, dm: true, url: `${slack!.url}archives/${d.channel}`, messages: channelMsgs[d.channel] ?? [] }))
             ],
             avatars: avatarByName
           }
@@ -216,7 +218,7 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   async function pollChannel(): Promise<void> {
     if (!slack) return
-    for (const c of CHANNELS) {
+    for (const c of [...CHANNELS, ...dms.map((d) => ({ id: d.channel, name: d.name }))]) {
       try {
         channelMsgs[c.id] = await Slack.downloadThumbs(slack.token, await Slack.readChannel(slack.token, slack.me, c.id, slack.who), MEDIA)
       } catch (err) {
@@ -293,6 +295,8 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (stored && stored.items) q = stored
     const threads = (await orca.storage.get('pinnedThreads')) as typeof pinned | null
     if (Array.isArray(threads)) pinned = threads
+    const dmTabs = (await orca.storage.get('dmTabs')) as typeof dms | null
+    if (Array.isArray(dmTabs)) dms = dmTabs
   })()
 
   async function commit(next: Q.Queue, pierced: Q.Item[] = []): Promise<View> {
@@ -432,7 +436,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     return msgs.filter((m) => m.ts !== ts)
   })
 
-  const teamChannel = (channel: string) => CHANNELS.some((c) => c.id === channel)
+  const teamChannel = (channel: string) => CHANNELS.some((c) => c.id === channel) || dms.some((d) => d.channel === channel)
 
   orca.commands.register('helpdesk.setupCollector', async () => {
     const prompt = readFileSync(COLLECTOR_PROMPT, 'utf8')
@@ -481,9 +485,34 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   orca.panels.handle('thread.close', async ({ id }) => {
     pinned = pinned.filter((t) => tabId(t) !== id)
+    dms = dms.filter((d) => d.channel !== id)
     delete channelMsgs[id]
     await orca.storage.set('pinnedThreads', pinned as never)
+    await orca.storage.set('dmTabs', dms as never)
     return view()
+  })
+
+  // ponytail: the person is found by name (exact, else a unique first name); pass the Slack user
+  // id from messages if two people ever share a name.
+  orca.panels.handle('dm.open', async ({ name }) => {
+    if (!slack) throw Object.assign(new Error('Slack is not connected'), { code: 'invalid_params' })
+    findUser ??= (await Slack.directory(slack.token)).find
+    const user = findUser(name)
+    if (!user) throw Object.assign(new Error(`No Slack user named ${name}`), { code: 'invalid_params' })
+    const opened = await Slack.call(slack.token, 'conversations.open', { users: user }).catch((err) => {
+      throw /missing_scope/.test(String(err)) ? new Error('Add the im:write scope to your Slack app, reinstall it and reconnect Slack') : err
+    })
+    const channel = opened.channel.id as string
+    if (!dms.some((d) => d.channel === channel)) {
+      dms = [...dms, { channel, name: name.split(/\s+/)[0]! }]
+      await orca.storage.set('dmTabs', dms as never)
+    }
+    try {
+      channelMsgs[channel] = await Slack.downloadThumbs(slack.token, await Slack.readChannel(slack.token, slack.me, channel, slack.who), MEDIA)
+    } catch (err) {
+      orca.log(`slack: dm ${channel} ${String(err)}`)
+    }
+    return { view: view(), id: channel }
   })
 
   orca.panels.handle('slack.post', async ({ channel, text, ts }) => {

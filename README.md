@@ -21,7 +21,7 @@ orca plugin open local.helpdesk --panel helpdesk
 ## Set up (5 minutes)
 
 1. **Slack, to read threads and reply as you.** Create a Slack app at <https://api.slack.com/apps>. Under *OAuth & Permissions → User Token Scopes*, add:
-   `channels:history groups:history im:history mpim:history search:read users:read chat:write files:read`
+   `channels:history groups:history im:history mpim:history search:read users:read chat:write files:read im:write`
    Install it to your workspace and copy the **User OAuth Token** (`xoxp-…`). Paste it into the panel's **Connect Slack** field.
 2. **Calendar, for today's meetings.** In Google Calendar, go to *Settings → your calendar → Integrate calendar → Secret address in iCal format*. Paste that address into the panel's **Connect calendar** field.
 3. **Team channels.** In *Orca Settings → DreamDesk*:

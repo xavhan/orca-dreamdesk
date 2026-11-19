@@ -12,6 +12,7 @@ These are platform behaviours that DreamDesk relies on or works around. Every on
 
 - `Image src` must be a **PNG file inside the plugin folder**, given as a relative path such as `assets/x.png`. SVG, `data:` URIs and URLs are refused.
 - PNGs rendered by `qlmanage` get an opaque white background. Use `rsvg-convert -b none` to keep transparency.
+- An `Image` (or a `Badge`) inside a `Link` or `Button` makes the whole panel fail with "a layout Orca cannot show". Make the text next to it clickable instead (see `Who` in `panel.tsx`).
 - `Image size="xs"` is about 48px. To get a smaller image, put it in a fixed `<Box width={16} height={16}>` with `size="full"`. The `Icon` helper in `panel.tsx` does this.
 - Orca caches images by path. To replace an asset, give it a new filename.
 - New files in `assets/` only showed up after `orca plugin dev unload` followed by `dev load`. Files the worker downloads into `avatars/` and `media/` at runtime do show up. Both folders are gitignored.

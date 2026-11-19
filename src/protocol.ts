@@ -44,6 +44,8 @@ export interface Tab {
   channel: string
   /** Thread tabs only: the root message ts. */
   ts?: string
+  /** A direct conversation opened from an avatar; closable like a thread tab. */
+  dm?: boolean
   messages: Msg[]
 }
 
@@ -69,7 +71,10 @@ declare module 'orca' {
     'calendar.connect': { input: { url: string }; output: View }
     'worktree.open': { input: { id: string }; output: { ok: boolean } }
     'thread.open': { input: { channel: string; ts: string; title: string }; output: View }
+    /** Closes a thread or direct-conversation tab. */
     'thread.close': { input: { id: string }; output: View }
+    /** Opens (or reuses) a direct conversation with a person, as a team tab. `id` is the tab. */
+    'dm.open': { input: { name: string }; output: { view: View; id: string } }
     /** Replies of a thread in a team channel, root excluded, oldest first. */
     'slack.thread': { input: { channel: string; ts: string }; output: Msg[] }
   }
