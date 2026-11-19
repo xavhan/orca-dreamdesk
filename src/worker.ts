@@ -318,9 +318,13 @@ export default function activate(orca: OrcaWorkerApi): void {
   })()
 
   async function commit(next: Q.Queue, pierced: Q.Item[] = []): Promise<View> {
+    const before = q.focus?.itemId
     // Round-trip through JSON: storage refuses `undefined` fields.
     q = JSON.parse(JSON.stringify(Q.prune(next, Date.now())))
     writeSnapshot()
+    // Taking an item (by hand, from Background or the picker) opens its linked worktree in Orca.
+    const wt = q.focus?.itemId && q.focus.itemId !== before ? worktrees[q.focus.itemId] : undefined
+    if (wt) void orca.host.call('workspace.open', { workspaceId: wt.id }).catch((err) => orca.log(`worktrees: open ${String(err)}`))
     await orca.storage.set(KEY, q as never)
     const v = view()
     orca.panels.post('queue.changed', v)
