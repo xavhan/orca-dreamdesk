@@ -65,7 +65,8 @@ export interface Msg {
 
 export interface Queue {
   items: Record<string, Item>
-  focus: { itemId: string | null; since: number } | null
+  /** `relax`: lunch or end of day; urgent items wait silently until the user is back. */
+  focus: { itemId: string | null; since: number; relax?: boolean } | null
   alert: boolean
 }
 
@@ -272,6 +273,11 @@ export function worktreeStatus(q: Queue, workspaceId: string, status: string, no
 export function takeNext(q: Queue, now: number): Queue {
   const next = rank(q, now)[0]
   return next ? take(q, next.id, now) : q
+}
+
+/** Lunch break or end of the day: shield up, no notifications, until `release`. */
+export function relax(q: Queue, now: number): Queue {
+  return { ...endCurrent(q), focus: { itemId: null, since: now, relax: true } }
 }
 
 export function focusOther(q: Queue, now: number): Queue {

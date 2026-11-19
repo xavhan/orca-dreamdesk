@@ -280,3 +280,11 @@ test('awaitReply parks a Slack item until someone else posts in its thread', () 
   assert.equal(q.items[id]!.state, 'new')
   assert.equal(q.items[id]!.delegatedTo, undefined)
 })
+
+test('relax ends the current item and back to work releases it', () => {
+  let q = Q.ingest(Q.emptyQueue(), [{ source: 'linear', originId: 'A-1', type: 'ticket', urgent: false, title: 't', summary: '', at: 1 }], 1)
+  q = Q.relax(Q.take(q, 'linear:A-1', 2), 3)
+  assert.deepEqual(q.focus, { itemId: null, since: 3, relax: true })
+  assert.equal(q.items['linear:A-1']!.state, 'new')
+  assert.equal(Q.release(q).focus, null)
+})

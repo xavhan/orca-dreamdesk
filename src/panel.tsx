@@ -678,7 +678,7 @@ export default function Panel() {
           <Heading>DreamDesk</Heading>
           <Row gap="xs">
             <Badge>{`${v.next.length} to handle`}</Badge>
-            <Badge tone={v.focus ? 'accent' : 'success'}>{v.focus ? 'Focus' : 'Free'}</Badge>
+            <Badge tone={v.focus?.relax ? 'success' : v.focus ? 'accent' : 'success'}>{v.focus?.relax ? 'Relax' : v.focus ? 'Focus' : 'Free'}</Badge>
           </Row>
         </Row>
 
@@ -693,7 +693,18 @@ export default function Panel() {
 
         {v.current && v.focus ? <Current item={v.current} since={v.focus.since} /> : null}
 
-        {v.focus && !v.current ? (
+        {v.focus?.relax ? (
+          <Box direction="row" border="success" radius="md" paddingX="md" paddingY="sm" gap="sm" align="center">
+            <Stack gap="none">
+              <Text size="sm" weight="semibold">Relaxing</Text>
+              <Text size="xs" muted>
+                Since <RelativeTime at={v.focus.since} />. Notifications are off; urgent items will wait for you.
+              </Text>
+            </Stack>
+            <Box grow />
+            <Button size="sm" variant="outline" icon="play" tooltip="Back to the queue" onPress={() => act('release')}>Back to work</Button>
+          </Box>
+        ) : v.focus && !v.current ? (
           <Box direction="row" border radius="md" paddingX="md" paddingY="sm" gap="sm" align="center">
             <Spinner label="On something else" labelHidden />
             <Stack gap="none">
@@ -720,8 +731,9 @@ export default function Panel() {
             ) : (
               <EmptyState title="Nothing to handle" description="Shield is down, enjoy." icon="check" />
             )}
-            <Row justify="center">
+            <Row justify="center" gap="sm">
               <Button size="sm" variant="outline" icon="pause" tooltip="Raise the shield without taking an item from the queue" onPress={() => act('other')}>Working on something else</Button>
+              <Button size="sm" variant="outline" icon="star" tooltip="Lunch or end of the day: notifications off until you come back" onPress={() => act('relax')}>Relax</Button>
             </Row>
           </Stack>
         ) : null}

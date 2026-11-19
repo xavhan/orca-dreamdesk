@@ -2,7 +2,7 @@
 import type { Item, Msg, Queue, Status } from './queue'
 import type { Meeting } from './calendar'
 
-export type Action = 'take' | 'done' | 'pass' | 'sink' | 'answer' | 'await_reply' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
+export type Action = 'take' | 'done' | 'pass' | 'sink' | 'answer' | 'await_reply' | 'relax' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
 
 export interface View {
   focus: Queue['focus']

@@ -64,7 +64,8 @@ export function viewOf(q: Q.Queue, now: number, extra: Partial<View> = {}): View
     current: id ? (q.items[id] ?? null) : null,
     next: Q.rank(q, now),
     parked: Q.parked(q, now),
-    alert: q.alert,
+    // Relaxing: urgent items stay flagged but silent; the alert shows once the user is back.
+    alert: q.alert && !q.focus?.relax,
     slack: false,
     ...extra
   }
@@ -329,7 +330,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const v = view()
     orca.panels.post('queue.changed', v)
     await statusBar(v)
-    for (const item of pierced) {
+    for (const item of q.focus?.relax ? [] : pierced) {
       await orca.host.call('notifications.show', { title: `Urgent: ${item.title}`, body: item.summary }).catch(() => {})
     }
     return v
@@ -337,7 +338,7 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   async function statusBar(view: View): Promise<void> {
     const n = view.next.length
-    const mode = view.focus ? 'Focus' : 'Free'
+    const mode = view.focus?.relax ? 'Relax' : view.focus ? 'Focus' : 'Free'
     await orca.host
       .call('statusBar.update', {
         id: 'helpdesk',
@@ -657,6 +658,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       case 'snooze': return commit(Q.snooze(q, need(id, 'id'), Q.snoozeUntil(choice ?? '30m', now)))
       case 'delegate': return commit(Q.takeNext(Q.delegate(q, need(id, 'id'), need(terminalId, 'terminalId')), now))
       case 'other': return commit(Q.focusOther(q, now))
+      case 'relax': return commit(Q.relax(q, now))
       case 'release': return commit(Q.release(q))
       case 'ack': return commit(Q.ack(q))
     }
@@ -686,7 +688,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   let rowBlink = false
   const blinker = setInterval(() => {
     if (Object.values(worktrees).some((w) => w.state === 'working')) orca.panels.post('blink', (rowBlink = !rowBlink))
-    if (!q.alert) return
+    if (!q.alert || q.focus?.relax) return
     blink = !blink
     void statusBar(view())
   }, 1000)
