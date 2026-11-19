@@ -16,6 +16,8 @@ export interface Item {
   /** GitHub pull request the item is about; `prSettled` closes the item once it is handled. */
   prUrl?: string
   terminalId?: string
+  /** Agent requests only: short answers the panel offers as buttons, typed into `terminalId`. */
+  actions?: string[]
   reason?: string
   priority?: number
   people?: string[]
@@ -319,13 +321,17 @@ export function threadUpdate(q: Queue, id: string, msgs: readonly Msg[], now: nu
 
 /** A request another agent dropped in `~/.orca-helpdesk/requests/` through the DreamDesk MCP server. */
 export type Request =
-  | { op: 'add'; title: string; summary?: string; url?: string; prUrl?: string; importance?: number; urgent?: boolean; from?: 'me' | 'agent' }
+  | { op: 'add'; title: string; summary?: string; url?: string; prUrl?: string; importance?: number; urgent?: boolean; from?: 'me' | 'agent'; actions?: string[]; terminalId?: string }
   | { op: 'done' | 'pass'; id: string }
   | { op: 'snooze'; id: string; minutes: number }
   | { op: 'set_pr'; id: string; prUrl: string }
 
 const str = (v: unknown, max = 2000) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined)
 const prLink = (v: unknown) => (typeof v === 'string' && /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(v) ? v : undefined)
+
+/** At most 3 distinct short answers. */
+const answers = (v: unknown): string[] =>
+  Array.isArray(v) ? [...new Set(v.map((a) => str(a, 40)).filter((a): a is string => !!a))].slice(0, 3) : []
 
 /** Applies one request. Anything malformed or naming an unknown item throws, so the worker logs it. */
 export function applyRequest(q: Queue, raw: unknown, now: number): Queue {
@@ -345,6 +351,10 @@ export function applyRequest(q: Queue, raw: unknown, now: number): Queue {
       ...(str(r.url) ? { url: str(r.url) } : {}),
       ...(prLink(r.prUrl) ? { prUrl: prLink(r.prUrl) } : {}),
       ...([1, 2, 3, 4].includes(r.importance as number) ? { importance: r.importance as number } : {}),
+      // Suggested answers need the asking agent's terminal to be typed into.
+      ...(!me && typeof r.terminalId === 'string' && /^term_[\w-]+$/.test(r.terminalId) && answers(r.actions).length
+        ? { terminalId: r.terminalId, actions: answers(r.actions) }
+        : {}),
       reason: me ? 'Noted by you' : 'Added by an agent',
       arrivedAt: now,
       state: 'new'

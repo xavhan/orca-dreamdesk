@@ -256,3 +256,12 @@ test('needReason says briefly why an item needs the user', () => {
   assert.equal(Q.needReason(base, 'permission'), 'worktree agent waiting for you')
   assert.equal(Q.needReason({ ...base, kind: 'urgent' }), 'urgent')
 })
+
+test('applyRequest: an agent request can offer up to 3 short answers, only with its terminal', () => {
+  const add = (extra: object) => Object.values(Q.applyRequest(Q.emptyQueue(), { op: 'add', title: 'Commit and open the PR?', ...extra }, 1).items)[0]!
+  const item = add({ terminalId: 'term_ab-1', actions: ['Yes', 'No', 'Yes', '', 'Later', 'Never'] })
+  assert.deepEqual(item.actions, ['Yes', 'No', 'Later'])
+  assert.equal(item.terminalId, 'term_ab-1')
+  assert.equal(add({ actions: ['Yes'] }).actions, undefined)
+  assert.equal(add({ terminalId: 'rm -rf /', actions: ['Yes'] }).actions, undefined)
+})

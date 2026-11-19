@@ -626,7 +626,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     return view()
   })
 
-  orca.panels.handle('queue.act', async ({ action, id, choice, terminalId }) => {
+  orca.panels.handle('queue.act', async ({ action, id, choice, terminalId, answer }) => {
     await ready
     const now = Date.now()
     const need = (v: string | undefined, name: string): string => {
@@ -638,6 +638,14 @@ export default function activate(orca: OrcaWorkerApi): void {
       case 'done': return commit(Q.done(q, need(id, 'id')))
       case 'pass': return commit(Q.pass(q, need(id, 'id')))
       case 'sink': return commit(Q.sink(q, need(id, 'id'), now))
+      case 'answer': {
+        // Only an answer the agent offered, typed into the agent's own terminal.
+        const item = q.items[need(id, 'id')]
+        if (!item?.terminalId || !item.actions?.includes(answer ?? '')) throw Object.assign(new Error('not an offered answer'), { code: 'invalid_params' })
+        const { accepted } = await orca.host.call('terminal.sendText', { terminalId: item.terminalId, text: answer!, enter: true })
+        if (!accepted) throw Object.assign(new Error('The agent terminal is gone'), { code: 'action_failed' })
+        return commit(Q.done(q, item.id))
+      }
       case 'wait': {
         const wt = worktrees[need(id, 'id')]
         if (!wt) throw Object.assign(new Error('no linked worktree'), { code: 'invalid_params' })

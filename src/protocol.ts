@@ -2,7 +2,7 @@
 import type { Item, Msg, Queue, Status } from './queue'
 import type { Meeting } from './calendar'
 
-export type Action = 'take' | 'done' | 'pass' | 'sink' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
+export type Action = 'take' | 'done' | 'pass' | 'sink' | 'answer' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
 
 export interface View {
   focus: Queue['focus']
@@ -67,7 +67,7 @@ declare module 'orca' {
   interface PluginRequests {
     'queue.get': { output: View }
     'queue.act': {
-      input: { action: Action; id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string }
+      input: { action: Action; id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string; answer?: string }
       output: View
     }
     'agents.all': { output: AgentRow[] }

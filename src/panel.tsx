@@ -46,7 +46,7 @@ const SOURCE: Record<Item['source'], string> = { agent: 'Agent', slack: 'Slack',
 
 // ---- actions -------------------------------------------------------------
 
-async function act(action: Action, extra: { id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string } = {}) {
+async function act(action: Action, extra: { id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string; answer?: string } = {}) {
   set(view, await plugin.request('queue.act', { action, ...extra }))
 }
 
@@ -430,7 +430,13 @@ function Current({ item, since }: { item: Item; since: number }) {
       {item.source === 'slack' && v?.slack ? <Thread item={item} /> : null}
       <Row gap="xs" align="center" justify="between" wrap>
         <Row gap="xs" align="center">
-          <Button variant="solid" tone="success" icon="check" onPress={() => act('done', { id: item.id })}>Done</Button>
+          {item.actions?.length ? (
+            item.actions.map((a) => (
+              <Button variant="outline" tone="accent" tooltip={`Answer the agent "${a}"`} onPress={() => act('answer', { id: item.id, answer: a })}>{a}</Button>
+            ))
+          ) : (
+            <Button variant="solid" tone="success" icon="check" onPress={() => act('done', { id: item.id })}>Done</Button>
+          )}
           {item.prUrl ? (
             <Button variant="outline" icon="code" tooltip={`Open ${item.prUrl.replace('https://github.com/', '')} on GitHub`} onPress={() => shell.openExternal(item.prUrl!)}>Open PR</Button>
           ) : null}

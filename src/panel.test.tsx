@@ -196,3 +196,13 @@ test('a past meeting with a link still opens its meet from the day bar', async (
   assert.equal(view.host.callsOf('shell.openExternal').length, 1)
   await view.unmount()
 })
+
+test("an agent's offered answers replace Done and send the chosen one", async () => {
+  const calls: unknown[] = []
+  const current = item('c', { state: 'in_progress', source: 'agent', terminalId: 'term_1', actions: ['Yes, open the PR', 'No'] })
+  const view = await mount(panel, { host: hostWith({ ...free, focus: { itemId: 'c', since: 1 }, current }, calls) })
+  assert.ok(!JSON.stringify(view.tree()).includes('"Done"'))
+  await view.press({ text: 'Yes, open the PR' })
+  assert.deepEqual(calls, [{ action: 'answer', id: 'c', answer: 'Yes, open the PR' }])
+  await view.unmount()
+})

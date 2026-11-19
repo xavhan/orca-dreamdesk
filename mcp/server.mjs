@@ -30,7 +30,13 @@ const TOOLS = [
         url: { type: 'string' },
         prUrl: { type: 'string', description: 'GitHub pull request URL; DreamDesk clears the item once the PR is merged, closed or reviewed' },
         importance: { type: 'integer', minimum: 1, maximum: 4, description: '1 blocks someone … 4 information only' },
-        urgent: { type: 'boolean' }
+        urgent: { type: 'boolean' },
+        actions: {
+          type: 'array',
+          items: { type: 'string', maxLength: 40 },
+          maxItems: 3,
+          description: "When the answer is simple, up to 3 short answers (e.g. ['Yes, commit and open the PR', 'No']). The user's click is typed into your terminal as their reply, so phrase each as what they would type. Only works when you run in an Orca terminal."
+        }
       },
       required: ['title']
     }
@@ -87,7 +93,8 @@ async function request(body) {
 async function call(name, args = {}) {
   switch (name) {
     case 'dreamdesk_queue': return JSON.stringify(readSnapshot(), null, 2)
-    case 'dreamdesk_add': return request({ op: 'add', ...args, from: 'agent' })
+    // Orca gives each agent's processes its terminal: answers are typed back there.
+    case 'dreamdesk_add': return request({ op: 'add', ...args, from: 'agent', terminalId: process.env.ORCA_TERMINAL_HANDLE })
     case 'dreamdesk_note': return request({ op: 'add', title: args.title, summary: args.summary, url: args.url, importance: args.importance, from: 'me' })
     case 'dreamdesk_done': return request({ op: 'done', id: args.id })
     case 'dreamdesk_snooze': return request({ op: 'snooze', id: args.id, minutes: args.minutes })
