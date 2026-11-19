@@ -27,6 +27,8 @@ export interface View {
   ci?: { state: 'running' | 'failing' | 'passed'; url: string }
   /** Item id → what its row border shows (see `Q.status`). */
   status?: Record<string, Status>
+  /** Item id → why it needs the user (`Q.needReason`), for the "Needs you" label. */
+  needs?: Record<string, string>
   /** Queued item whose worktree is the one focused in Orca, when that is not the current item's. */
   here?: string
   /** Item id → Orca worktree linked to it (via `orca reference find`) and its agent status. */

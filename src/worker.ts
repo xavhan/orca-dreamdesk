@@ -198,6 +198,12 @@ export default function activate(orca: OrcaWorkerApi): void {
         calendar: !!calendar,
         ...(here() ? { here: here() } : {}),
         ...(q.focus?.itemId && prs[q.focus.itemId]?.ci ? { ci: { state: prs[q.focus.itemId]!.ci!, url: `${prs[q.focus.itemId]!.url}/checks` } } : {}),
+        needs: Object.fromEntries(
+          Object.values(q.items)
+            .filter((i) => i.state !== 'done' && i.state !== 'passed')
+            .map((i) => [i.id, Q.needReason(i, worktrees[i.id]?.state, prs[i.id])])
+            .filter(([, why]) => why)
+        ),
         status: Object.fromEntries(
           Object.values(q.items)
             .filter((i) => i.state !== 'done' && i.state !== 'passed')

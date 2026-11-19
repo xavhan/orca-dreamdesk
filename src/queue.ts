@@ -400,8 +400,20 @@ export function ciState(checks: readonly { status?: string; conclusion?: string;
  *  CI or a review, white is yours to act on, none is idle (info only, snoozed). */
 export type Status = 'need' | 'working' | 'waiting' | 'actionable' | 'idle'
 
-export function status(item: Item, worktree?: string, pr?: { ci?: CiState; awaitingReview: boolean }): Status {
-  if (item.kind === 'urgent' || item.source === 'agent' || worktree === 'permission' || pr?.ci === 'failing') return 'need'
+type PrStatus = { ci?: CiState; awaitingReview: boolean }
+
+/** Why an item needs the user, in a few words; undefined when it does not. */
+export function needReason(item: Item, worktree?: string, pr?: PrStatus): string | undefined {
+  if (item.kind === 'urgent') return 'urgent'
+  if (item.kind === 'agent') return 'agent waiting for you'
+  if (item.source === 'agent') return 'agent asks you'
+  if (worktree === 'permission') return 'worktree agent waiting for you'
+  if (pr?.ci === 'failing') return 'CI failing'
+  return undefined
+}
+
+export function status(item: Item, worktree?: string, pr?: PrStatus): Status {
+  if (needReason(item, worktree, pr)) return 'need'
   if (worktree === 'working') return 'working'
   if (pr?.ci === 'running' || pr?.awaitingReview || item.state === 'delegated') return 'waiting'
   if (importance(item) === 4 || item.state === 'snoozed') return 'idle'

@@ -248,3 +248,11 @@ test('applyRequest: a task noted by the user is their own source, not an agent a
   assert.ok(item.id.startsWith('me:'))
   assert.equal(Q.status(item), 'actionable')
 })
+
+test('needReason says briefly why an item needs the user', () => {
+  const base = Q.ingest(Q.emptyQueue(), [{ source: 'linear', originId: 'A-1', type: 'ticket', urgent: false, title: 't', summary: '', at: 1 }], 1).items['linear:A-1']!
+  assert.equal(Q.needReason(base), undefined)
+  assert.equal(Q.needReason(base, 'working', { ci: 'failing', awaitingReview: false }), 'CI failing')
+  assert.equal(Q.needReason(base, 'permission'), 'worktree agent waiting for you')
+  assert.equal(Q.needReason({ ...base, kind: 'urgent' }), 'urgent')
+})

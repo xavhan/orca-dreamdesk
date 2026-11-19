@@ -284,6 +284,7 @@ function Hero({ item, label, since, children }: { item: Item; label: string; sin
       </Row>
       <Stack gap="xs">
         <Text size="md" weight="semibold">{item.title}</Text>
+        {read(view)?.needs?.[item.id] ? <Text size="sm"><NeedsYou item={item} /></Text> : null}
         {item.summary ? <Text size="sm" muted>{item.summary}</Text> : null}
       </Stack>
       <Row gap="sm" align="center" wrap>
@@ -302,6 +303,12 @@ const BORDER = { need: 'danger', working: 'warning', waiting: 'warning', actiona
 // Panels cannot animate: the worker sends `blink` every second while an agent works, and the
 // borders of those rows follow it.
 const blinkOn = atom(true)
+
+/** Red "Needs you · <reason>" lead-in, when the item needs the user. */
+function NeedsYou({ item }: { item: Item }) {
+  const why = read(view)?.needs?.[item.id]
+  return why ? <Text size="xs" weight="semibold" tone="danger">{`Needs you · ${why}  `}</Text> : null
+}
 
 /** What the row borders mean (see BORDER); the "agent running" dot blinks like its rows. */
 function Legend() {
@@ -334,7 +341,10 @@ function QueueRow({ item, badge }: { item: Item; badge?: string }) {
       <Icon src={LOGO[item.source]} alt={SOURCE[item.source]} />
       <Box direction="column" grow minWidth={0}>
         <Text size="sm" weight="medium" truncate>{item.title}</Text>
-        <Text size="xs" muted truncate>{item.summary}</Text>
+        <Text size="xs" muted truncate>
+          <NeedsYou item={item} />
+          {item.summary}
+        </Text>
       </Box>
       <People item={item} names={false} max={2} />
       {badge ? <Badge>{badge}</Badge> : <Priority item={item} />}
