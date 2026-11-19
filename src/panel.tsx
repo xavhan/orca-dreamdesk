@@ -673,8 +673,8 @@ export default function Panel() {
   const queued = v.focus ? v.next : rest
   return (
     // Queue scrolls; the team chat stays pinned at the bottom.
-    <Box direction="column" height="100%" gap="md">
-      <Box direction="column" gap="md" grow minHeight={0} scroll="y">
+    <Box direction="column" height="100%" gap="lg">
+      <Box direction="column" gap="lg" grow minHeight={0} scroll="y">
         <Row justify="between" align="center">
           <Heading>DreamDesk</Heading>
           <Row gap="xs">
@@ -755,7 +755,7 @@ export default function Panel() {
           </Collapsible>
         ) : null}
       </Box>
-      <Box direction="column" shrink={false} gap="md">
+      <Box direction="column" shrink={false} gap="lg">
         <Meetings v={v} />
         {v.channels?.length ? (
           <Channels tabs={v.channels} />
