@@ -320,6 +320,16 @@ export function prSettled(pr: PrInfo, me: string): boolean {
   return pr.author !== me && pr.reviewers.some((r) => r !== pr.author)
 }
 
+/** CI of a PR from gh's `statusCheckRollup` (check runs have status/conclusion, commit statuses
+ *  have state): failing beats running beats passed; no checks → undefined. */
+export function ciState(checks: readonly { status?: string; conclusion?: string; state?: string }[]): 'running' | 'failing' | 'passed' | undefined {
+  if (!checks.length) return undefined
+  const bad = ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE']
+  if (checks.some((c) => bad.includes(c.conclusion ?? '') || bad.includes(c.state ?? ''))) return 'failing'
+  if (checks.some((c) => (c.status && c.status !== 'COMPLETED') || c.state === 'PENDING' || c.state === 'EXPECTED')) return 'running'
+  return 'passed'
+}
+
 // Slack ids and links. Pure, so the panel can import them (it cannot load node: modules).
 
 /** Collector origin ids are `<channel>:<thread ts>`. */

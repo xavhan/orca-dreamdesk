@@ -23,6 +23,8 @@ export interface View {
   /** When the worker built this view; the timeline's "now". */
   nowAt?: number
   meetings?: (Meeting & { status: 'past' | 'now' | 'upcoming' })[]
+  /** CI of the current item's PR (its PR link, else its worktree's branch), polled every minute. */
+  ci?: { state: 'running' | 'failing' | 'passed'; url: string }
   /** Item id → Orca worktree linked to it (via `orca reference find`) and its agent status. */
   worktrees?: Record<string, Worktree>
   /** Person name → avatar file, for people the collector names. */

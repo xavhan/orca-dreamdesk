@@ -192,3 +192,13 @@ test('takeNext focuses the top item once the current one is in the background', 
   assert.equal(q.items['linear:A-1']!.state, 'delegated')
   assert.equal(Q.takeNext(Q.emptyQueue(), 1).focus, null)
 })
+
+test('ciState: failing beats running beats passed', () => {
+  const done = { status: 'COMPLETED', conclusion: 'SUCCESS' }
+  assert.equal(Q.ciState([]), undefined)
+  assert.equal(Q.ciState([done, { status: 'COMPLETED', conclusion: 'SKIPPED' }]), 'passed')
+  assert.equal(Q.ciState([done, { status: 'IN_PROGRESS' }]), 'running')
+  assert.equal(Q.ciState([done, { state: 'PENDING' }]), 'running')
+  assert.equal(Q.ciState([{ status: 'IN_PROGRESS' }, { status: 'COMPLETED', conclusion: 'FAILURE' }]), 'failing')
+  assert.equal(Q.ciState([{ state: 'ERROR' }]), 'failing')
+})

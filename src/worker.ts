@@ -191,6 +191,8 @@ export default function activate(orca: OrcaWorkerApi): void {
       {
         worktrees,
         calendar: !!calendar,
+        // Only for the item it was polled for: focus may have moved since.
+        ...(ci && ci.itemId === q.focus?.itemId ? { ci: { state: ci.state, url: ci.url } } : {}),
         ...(PERMACONF ? { permaconf: PERMACONF } : {}),
         nowAt: Date.now(),
         meetings: meetings(Date.now()),
@@ -301,7 +303,9 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   async function commit(next: Q.Queue, pierced: Q.Item[] = []): Promise<View> {
     // Round-trip through JSON: storage refuses `undefined` fields.
+    const focusMoved = next.focus?.itemId !== q.focus?.itemId
     q = JSON.parse(JSON.stringify(Q.prune(next, Date.now())))
+    if (focusMoved) void pollCi()
     await orca.storage.set(KEY, q as never)
     const v = view()
     orca.panels.post('queue.changed', v)
@@ -326,8 +330,8 @@ export default function activate(orca: OrcaWorkerApi): void {
   }
 
   // gh lives in Homebrew, which an app-launched worker's PATH may not include.
-  const gh = (args: string[]) =>
-    run('gh', args, { timeout: 15_000, env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` } })
+  const gh = (args: string[], cwd?: string) =>
+    run('gh', args, { timeout: 15_000, cwd, env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` } })
   let ghLogin = ''
 
   /** Closes PR items once the PR is merged, closed or reviewed (see `Q.prSettled`).
@@ -359,6 +363,28 @@ export default function activate(orca: OrcaWorkerApi): void {
     }
     // Applied to the queue as it is now: the user may have acted during the gh calls.
     if (settled.length) await commit(settled.reduce((acc, id) => Q.done(acc, id), q))
+  }
+
+  let ci: (NonNullable<View['ci']> & { itemId: string }) | undefined
+  /** CI of the focused item's PR: from its PR link, else from its worktree's current branch. */
+  async function pollCi(): Promise<void> {
+    const item = q.focus?.itemId ? q.items[q.focus.itemId] : undefined
+    const dir = item && worktrees[item.id]?.id.split('::')[1]
+    let next: typeof ci
+    if (item?.prUrl || dir) {
+      try {
+        const args = ['pr', 'view', ...(item!.prUrl ? [item!.prUrl] : []), '--json', 'url,statusCheckRollup']
+        const pr = JSON.parse((await gh(args, item!.prUrl ? undefined : dir)).stdout)
+        const state = Q.ciState(pr.statusCheckRollup ?? [])
+        if (state) next = { itemId: item!.id, state, url: `${pr.url}/checks` }
+      } catch {
+        // No PR for this branch yet, or gh unavailable: no indicator.
+      }
+    }
+    if (JSON.stringify(next) !== JSON.stringify(ci)) {
+      ci = next
+      orca.panels.post('queue.changed', view())
+    }
   }
 
   async function ingestInbox(): Promise<void> {
@@ -574,7 +600,7 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   // The status bar item keeps this worker alive, so plain timers are enough.
   const tick = setInterval(
-    () => void ingestInbox().then(pollThreads).then(pollChannel).then(pollPrs).then(pollWorktrees).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
+    () => void ingestInbox().then(pollThreads).then(pollChannel).then(pollPrs).then(pollWorktrees).then(pollCi).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
     60_000
   )
   const blinker = setInterval(() => {

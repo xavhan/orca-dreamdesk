@@ -363,6 +363,18 @@ function MoreMenu({ item }: { item: Item }) {
   )
 }
 
+const CI = {
+  running: { label: 'Waiting for CI', tone: 'warning', icon: 'refresh' },
+  failing: { label: 'CI failing', tone: 'danger', icon: 'error' },
+  passed: { label: 'CI passed', tone: 'success', icon: 'check' }
+} as const
+
+/** The current item's PR checks; opens them on GitHub. */
+function CiBadge({ ci }: { ci: NonNullable<View['ci']> }) {
+  const c = CI[ci.state]
+  return <Button size="sm" variant="ghost" tone={c.tone} icon={c.icon} tooltip="Open the checks on GitHub" onPress={() => shell.openExternal(ci.url)}>{c.label}</Button>
+}
+
 function Current({ item, since }: { item: Item; since: number }) {
   const v = read(view)
   const hasWorktree = !!v?.worktrees?.[item.id]
@@ -375,6 +387,7 @@ function Current({ item, since }: { item: Item; since: number }) {
           {item.prUrl ? (
             <Button variant="outline" icon="code" tooltip={`Open ${item.prUrl.replace('https://github.com/', '')} on GitHub`} onPress={() => shell.openExternal(item.prUrl!)}>Open PR</Button>
           ) : null}
+          {v?.ci ? <CiBadge ci={v.ci} /> : null}
           {hasWorktree ? (
             <Button variant="outline" tone="accent" icon="branch" tooltip="Back to the queue once the worktree agent finishes or needs you; opens the next item now" onPress={() => act('wait', { id: item.id })}>Background</Button>
           ) : null}
