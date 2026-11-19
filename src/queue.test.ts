@@ -240,3 +240,11 @@ test('status: need beats working beats waiting beats actionable', () => {
   assert.equal(Q.status(base, 'permission'), 'need')
   assert.equal(Q.status({ ...base, kind: 'urgent' }), 'need')
 })
+
+test('applyRequest: a task noted by the user is their own source, not an agent asking for them', () => {
+  const q = Q.applyRequest(Q.emptyQueue(), { op: 'add', from: 'me', title: 'Call the accountant' }, 1)
+  const item = Object.values(q.items)[0]!
+  assert.equal(item.source, 'me')
+  assert.ok(item.id.startsWith('me:'))
+  assert.equal(Q.status(item), 'actionable')
+})

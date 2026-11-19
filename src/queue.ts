@@ -7,7 +7,8 @@ export type AgentState = 'working' | 'blocked' | 'waiting' | 'done'
 
 export interface Item {
   id: string
-  source: 'agent' | 'slack' | 'linear'
+  /** `me`: a task the user noted for themself (through the MCP server), logged nowhere else. */
+  source: 'agent' | 'slack' | 'linear' | 'me'
   kind: Kind
   title: string
   summary: string
@@ -318,7 +319,7 @@ export function threadUpdate(q: Queue, id: string, msgs: readonly Msg[], now: nu
 
 /** A request another agent dropped in `~/.orca-helpdesk/requests/` through the DreamDesk MCP server. */
 export type Request =
-  | { op: 'add'; title: string; summary?: string; url?: string; prUrl?: string; importance?: number; urgent?: boolean }
+  | { op: 'add'; title: string; summary?: string; url?: string; prUrl?: string; importance?: number; urgent?: boolean; from?: 'me' | 'agent' }
   | { op: 'done' | 'pass'; id: string }
   | { op: 'snooze'; id: string; minutes: number }
   | { op: 'set_pr'; id: string; prUrl: string }
@@ -333,17 +334,18 @@ export function applyRequest(q: Queue, raw: unknown, now: number): Queue {
     const title = str(r.title, 200)
     if (!title) throw new Error('add: title required')
     const urgent = r.urgent === true
-    const id = `agent:mcp:${now.toString(36)}:${Math.random().toString(36).slice(2, 6)}`
+    const me = r.from === 'me'
+    const id = `${me ? 'me' : 'agent:mcp'}:${now.toString(36)}:${Math.random().toString(36).slice(2, 6)}`
     const q2 = put(q, {
       id,
-      source: 'agent',
+      source: me ? 'me' : 'agent',
       kind: urgent ? 'urgent' : 'mention',
       title,
       summary: str(r.summary) ?? '',
       ...(str(r.url) ? { url: str(r.url) } : {}),
       ...(prLink(r.prUrl) ? { prUrl: prLink(r.prUrl) } : {}),
       ...([1, 2, 3, 4].includes(r.importance as number) ? { importance: r.importance as number } : {}),
-      reason: 'Added by an agent',
+      reason: me ? 'Noted by you' : 'Added by an agent',
       arrivedAt: now,
       state: 'new'
     })

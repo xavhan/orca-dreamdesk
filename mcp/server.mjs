@@ -21,7 +21,7 @@ const TOOLS = [
   },
   {
     name: 'dreamdesk_add',
-    description: 'Add an item to the user\'s queue, for something that needs them: a review, a decision, a follow-up. Use urgent only for real emergencies: it breaks through their focus.',
+    description: 'Add an item to the user\'s queue for something YOU, the agent, need from them: a review, a decision. Use urgent only for real emergencies: it breaks through their focus. For a task the user asks you to note for themself, use dreamdesk_note.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -31,6 +31,20 @@ const TOOLS = [
         prUrl: { type: 'string', description: 'GitHub pull request URL; DreamDesk clears the item once the PR is merged, closed or reviewed' },
         importance: { type: 'integer', minimum: 1, maximum: 4, description: '1 blocks someone … 4 information only' },
         urgent: { type: 'boolean' }
+      },
+      required: ['title']
+    }
+  },
+  {
+    name: 'dreamdesk_note',
+    description: "Add a task the user asks you to note for them in their DreamDesk queue: something to not lose track of during their day that is logged in no other system (not Linear, not Slack). Use this, not dreamdesk_add, whenever the user says 'note', 'remind me', 'add to my queue' or similar.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Short title in the user\'s words, 8 words max' },
+        summary: { type: 'string', description: 'Any detail the user gave, 2 sentences max' },
+        url: { type: 'string' },
+        importance: { type: 'integer', minimum: 1, maximum: 4, description: '1 blocks someone … 4 information only; leave out if the user did not say' }
       },
       required: ['title']
     }
@@ -73,7 +87,8 @@ async function request(body) {
 async function call(name, args = {}) {
   switch (name) {
     case 'dreamdesk_queue': return JSON.stringify(readSnapshot(), null, 2)
-    case 'dreamdesk_add': return request({ op: 'add', ...args })
+    case 'dreamdesk_add': return request({ op: 'add', ...args, from: 'agent' })
+    case 'dreamdesk_note': return request({ op: 'add', title: args.title, summary: args.summary, url: args.url, importance: args.importance, from: 'me' })
     case 'dreamdesk_done': return request({ op: 'done', id: args.id })
     case 'dreamdesk_snooze': return request({ op: 'snooze', id: args.id, minutes: args.minutes })
     case 'dreamdesk_set_pr': return request({ op: 'set_pr', id: args.id, prUrl: args.prUrl })

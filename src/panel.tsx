@@ -41,8 +41,8 @@ const sending = atom(false)
 const sendError = atom<string | null>(null)
 const tokenDraft = atom('')
 
-const LOGO: Record<Item['source'], string> = { agent: 'assets/agent-mark.png', slack: 'assets/slack-mark.png', linear: 'assets/linear-mark.png' }
-const SOURCE: Record<Item['source'], string> = { agent: 'Agent', slack: 'Slack', linear: 'Linear' }
+const LOGO: Record<Item['source'], string> = { agent: 'assets/agent-mark.png', slack: 'assets/slack-mark.png', linear: 'assets/linear-mark.png', me: 'assets/me-mark.png' }
+const SOURCE: Record<Item['source'], string> = { agent: 'Agent', slack: 'Slack', linear: 'Linear', me: 'Noted by you' }
 
 // ---- actions -------------------------------------------------------------
 
