@@ -717,18 +717,6 @@ export default function Panel() {
                   {rest.length ? <Button variant="ghost" icon="next" tooltip="Send it to the bottom of the queue" onPress={() => act('sink', { id: first.id })}>Move to bottom</Button> : null}
                   <Button variant="ghost" icon="close" tooltip="Not relevant to me" onPress={() => act('pass', { id: first.id })}>Dismiss</Button>
                 </Row>
-                {rest.length ? (
-                  <Select
-                    label="Take another task"
-                    labelHidden
-                    placeholder="Take another task…"
-                    options={rest.map((i) => ({ value: i.id, label: i.title }))}
-                    onChange={(id) => {
-                      const pick = rest.find((i) => i.id === id)
-                      if (pick) void take(pick)
-                    }}
-                  />
-                ) : null}
               </Hero>
             ) : (
               <EmptyState title="Nothing to handle" description="Shield is down, enjoy." icon="check" />
