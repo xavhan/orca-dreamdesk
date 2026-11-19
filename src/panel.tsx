@@ -738,32 +738,33 @@ export default function Panel() {
             <Button size="sm" variant="outline" icon="play" tooltip="Back to the queue" onPress={() => act('release')}>Back to work</Button>
           </Box>
         ) : v.focus && !v.current ? (
-          <Box direction="row" border radius="md" paddingX="md" paddingY="sm" gap="sm" align="center">
-            <Spinner label="On something else" labelHidden />
-            <Stack gap="none">
-              <Text size="sm" weight="semibold">On something else</Text>
-              <Text size="xs" muted>
-                Shield up since <RelativeTime at={v.focus.since} />
-              </Text>
-            </Stack>
-            <Box grow />
-            <Button size="sm" variant="outline" icon="check" tooltip="Back to the queue" onPress={() => act('release')}>I'm done</Button>
+          <Box direction="column" border radius="md" paddingX="md" paddingY="sm" gap="sm">
+            <Row gap="sm" align="center">
+              <Spinner label="On something else" labelHidden />
+              <Stack gap="none">
+                <Text size="sm" weight="semibold">On something else</Text>
+                <Text size="xs" muted>
+                  Shield up since <RelativeTime at={v.focus.since} />
+                </Text>
+              </Stack>
+              <Box grow />
+              <Button size="sm" variant="outline" icon="check" tooltip="Back to the queue" onPress={() => act('release')}>I'm done</Button>
+            </Row>
+            {/* stretch: the Start button takes the input's height. */}
+            <Row gap="xs" align="stretch">
+              <Box grow>
+                <Input
+                  label="What are you working on?"
+                  labelHidden
+                  placeholder="What are you on? It becomes your current task"
+                  value={read(taskDraft)}
+                  onChange={(t) => set(taskDraft, t)}
+                  onSubmit={(t) => startTask(t)}
+                />
+              </Box>
+              <Button variant="outline" icon="add" disabled={!read(taskDraft).trim()} onPress={() => startTask(read(taskDraft))}>Start</Button>
+            </Row>
           </Box>
-        ) : null}
-        {v.focus && !v.current && !v.focus.relax ? (
-          <Row gap="xs" align="end">
-            <Box grow>
-              <Input
-                label="What are you working on?"
-                labelHidden
-                placeholder="What are you working on? It becomes your current task"
-                value={read(taskDraft)}
-                onChange={(t) => set(taskDraft, t)}
-                onSubmit={(t) => startTask(t)}
-              />
-            </Box>
-            <Button variant="outline" icon="add" disabled={!read(taskDraft).trim()} onPress={() => startTask(read(taskDraft))}>Start</Button>
-          </Row>
         ) : null}
 
         {!v.focus ? (
