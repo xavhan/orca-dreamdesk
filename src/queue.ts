@@ -12,6 +12,8 @@ export interface Item {
   title: string
   summary: string
   url?: string
+  /** GitHub pull request the item is about; `prSettled` closes the item once it is handled. */
+  prUrl?: string
   terminalId?: string
   reason?: string
   priority?: number
@@ -69,6 +71,8 @@ export interface Incoming {
   title: string
   summary: string
   url?: string
+  /** GitHub pull request the entry is about, when there is one. */
+  prUrl?: string
   reason?: string
   priority?: number
   /** Names of the people involved, for the avatars row. */
@@ -112,6 +116,7 @@ export function ingest(q: Queue, incoming: readonly Incoming[], now: number): Qu
       title: inc.title,
       summary: inc.summary,
       url: inc.url,
+      ...(typeof inc.prUrl === 'string' ? { prUrl: inc.prUrl } : {}),
       reason: inc.reason ?? (inc.urgent === undefined ? 'not classified' : undefined),
       priority: inc.priority,
       importance: [1, 2, 3, 4].includes(inc.importance as number) ? inc.importance : undefined,
@@ -122,11 +127,12 @@ export function ingest(q: Queue, incoming: readonly Incoming[], now: number): Qu
     if (!prev) {
       q = put(q, fresh)
     } else if ((prev.state === 'snoozed' || prev.state === 'passed') && !urgent) {
-      q = put(q, { ...prev, summary: fresh.summary, title: fresh.title })
+      q = put(q, { ...prev, summary: fresh.summary, title: fresh.title, prUrl: fresh.prUrl ?? prev.prUrl })
     } else {
       const keep = prev.state === 'in_progress' || prev.state === 'delegated'
       q = put(q, {
         ...fresh,
+        prUrl: fresh.prUrl ?? prev.prUrl,
         arrivedAt: keep ? prev.arrivedAt : fresh.arrivedAt,
         state: keep ? prev.state : 'new',
         delegatedTo: prev.delegatedTo,
@@ -291,6 +297,21 @@ export function threadUpdate(q: Queue, id: string, msgs: readonly Msg[], now: nu
   const changes: Partial<Item> = { thread: msgs.slice(-5), seenTs: newest }
   if (fresh && item.state === 'done') Object.assign(changes, { state: 'new', arrivedAt: now })
   return patch(q, id, changes)
+}
+
+/** What `gh pr view --json state,author,reviews` says, flattened. */
+export interface PrInfo {
+  state: string
+  author: string
+  /** Logins of submitted reviews (pending drafts excluded). */
+  reviewers: string[]
+}
+
+/** A PR item is handled once the PR is merged or closed or, unless it is the user's own PR,
+ *  once anyone but its author has reviewed it. */
+export function prSettled(pr: PrInfo, me: string): boolean {
+  if (pr.state === 'MERGED' || pr.state === 'CLOSED') return true
+  return pr.author !== me && pr.reviewers.some((r) => r !== pr.author)
 }
 
 // Slack ids and links. Pure, so the panel can import them (it cannot load node: modules).

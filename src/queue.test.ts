@@ -164,3 +164,21 @@ test('waiting on a worktree: item comes back only when the agent turns to needin
   assert.equal(q.items['linear:TC-1'].state, 'new')
   assert.equal(q.items['linear:TC-1'].reason, 'The worktree agent needs you.')
 })
+
+test('prSettled: merged or closed, or reviewed by someone else unless it is my PR', () => {
+  const pr = (state: string, author: string, reviewers: string[] = []) => ({ state, author, reviewers })
+  assert.equal(Q.prSettled(pr('MERGED', 'bob'), 'me'), true)
+  assert.equal(Q.prSettled(pr('CLOSED', 'me'), 'me'), true)
+  assert.equal(Q.prSettled(pr('OPEN', 'bob'), 'me'), false)
+  assert.equal(Q.prSettled(pr('OPEN', 'bob', ['bob']), 'me'), false)
+  assert.equal(Q.prSettled(pr('OPEN', 'bob', ['alice']), 'me'), true)
+  assert.equal(Q.prSettled(pr('OPEN', 'bob', ['me']), 'me'), true)
+  assert.equal(Q.prSettled(pr('OPEN', 'me', ['alice']), 'me'), false)
+})
+
+test('ingest keeps the PR link across updates', () => {
+  const base = { source: 'linear' as const, originId: 'ENG-1', type: 'ticket' as const, urgent: false, title: 't', summary: 's', at: 1 }
+  let q = Q.ingest(Q.emptyQueue(), [{ ...base, prUrl: 'https://github.com/acme/app/pull/1' }], 1)
+  q = Q.ingest(q, [base], 2)
+  assert.equal(q.items['linear:ENG-1']!.prUrl, 'https://github.com/acme/app/pull/1')
+})

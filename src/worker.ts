@@ -321,6 +321,42 @@ export default function activate(orca: OrcaWorkerApi): void {
       .catch(() => {})
   }
 
+  // gh lives in Homebrew, which an app-launched worker's PATH may not include.
+  const gh = (args: string[]) =>
+    run('gh', args, { timeout: 15_000, env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` } })
+  let ghLogin = ''
+
+  /** Closes PR items once the PR is merged, closed or reviewed (see `Q.prSettled`).
+   *  ponytail: one gh call per open PR item per minute; batch through GraphQL if that gets slow. */
+  async function pollPrs(): Promise<void> {
+    const open = Object.values(q.items).filter((i) => i.prUrl && i.state !== 'done')
+    if (!open.length) return
+    try {
+      ghLogin ||= (await gh(['api', 'user', '--jq', '.login'])).stdout.trim()
+    } catch (err) {
+      if (!refErrors.has('gh')) orca.log(`prs: gh unavailable ${String(err).slice(0, 200)}`)
+      refErrors.add('gh')
+      return
+    }
+    const settled: string[] = []
+    for (const item of open) {
+      try {
+        const pr = JSON.parse((await gh(['pr', 'view', item.prUrl!, '--json', 'state,author,reviews'])).stdout)
+        const info: Q.PrInfo = {
+          state: pr.state,
+          author: pr.author?.login ?? '',
+          reviewers: (pr.reviews ?? []).filter((r: any) => r.state !== 'PENDING').map((r: any) => r.author?.login ?? '')
+        }
+        if (Q.prSettled(info, ghLogin)) settled.push(item.id)
+      } catch (err) {
+        if (!refErrors.has(item.prUrl!)) orca.log(`prs: ${item.prUrl} ${String(err).slice(0, 200)}`)
+        refErrors.add(item.prUrl!)
+      }
+    }
+    // Applied to the queue as it is now: the user may have acted during the gh calls.
+    if (settled.length) await commit(settled.reduce((acc, id) => Q.done(acc, id), q))
+  }
+
   async function ingestInbox(): Promise<void> {
     await ready
     const { entries: incoming, files } = readInbox(INBOX, (m) => orca.log(m))
@@ -507,7 +543,7 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   // The status bar item keeps this worker alive, so plain timers are enough.
   const tick = setInterval(
-    () => void ingestInbox().then(pollThreads).then(pollChannel).then(pollWorktrees).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
+    () => void ingestInbox().then(pollThreads).then(pollChannel).then(pollPrs).then(pollWorktrees).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
     60_000
   )
   const blinker = setInterval(() => {
