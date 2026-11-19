@@ -1,0 +1,77 @@
+// The panel <-> worker contract, declared once: src/panel.tsx and src/worker.ts both read it.
+import type { Item, Msg, Queue } from './queue'
+import type { Meeting } from './calendar'
+
+export type Action = 'take' | 'done' | 'pass' | 'wait' | 'snooze' | 'delegate' | 'other' | 'release' | 'ack'
+
+export interface View {
+  focus: Queue['focus']
+  current: Item | null
+  next: Item[]
+  parked: Item[]
+  alert: boolean
+  /** Whether a Slack user token is connected. */
+  slack: boolean
+  /** Workspace URL such as https://acme.slack.com/, to build thread links. */
+  slackUrl?: string
+  /** Team tabs: channel feeds, then threads opened in their own tab. Messages oldest first. */
+  channels?: Tab[]
+  /** Whether a calendar feed is connected, and today's meetings with where they stand now. */
+  calendar?: boolean
+  /** When the worker built this view; the timeline's "now". */
+  nowAt?: number
+  meetings?: (Meeting & { status: 'past' | 'now' | 'upcoming' })[]
+  /** Item id → Orca worktree linked to it (via `orca reference find`) and its agent status. */
+  worktrees?: Record<string, Worktree>
+  /** Person name → avatar file, for people the collector names. */
+  avatars?: Record<string, string>
+}
+
+export interface Worktree {
+  id: string
+  name: string
+  /** Workspace status from workspace.list: working, permission (needs you), done, active, inactive. */
+  state: string
+}
+
+export interface Tab {
+  /** Channel id, or `<channel>:<ts>` for a thread tab. */
+  id: string
+  name: string
+  url: string
+  channel: string
+  /** Thread tabs only: the root message ts. */
+  ts?: string
+  messages: Msg[]
+}
+
+export interface AgentRow {
+  terminalId: string
+  title: string
+  workspace: string
+}
+
+declare module 'orca' {
+  interface PluginRequests {
+    'queue.get': { output: View }
+    'queue.act': {
+      input: { action: Action; id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string }
+      output: View
+    }
+    'agents.all': { output: AgentRow[] }
+    'item.open': { input: { id: string }; output: { ok: boolean } }
+    'slack.connect': { input: { token: string }; output: View }
+    'slack.reply': { input: { id: string; text: string }; output: View }
+    /** Posts in a team channel, or in one of its threads when `ts` is given. */
+    'slack.post': { input: { channel: string; text: string; ts?: string }; output: View }
+    'calendar.connect': { input: { url: string }; output: View }
+    'worktree.open': { input: { id: string }; output: { ok: boolean } }
+    'thread.open': { input: { channel: string; ts: string; title: string }; output: View }
+    'thread.close': { input: { id: string }; output: View }
+    /** Replies of a thread in a team channel, root excluded, oldest first. */
+    'slack.thread': { input: { channel: string; ts: string }; output: Msg[] }
+  }
+  interface PluginPanelEvents {
+    'queue.changed': View
+  }
+}

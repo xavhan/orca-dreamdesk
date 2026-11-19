@@ -1,0 +1,95 @@
+{
+  "manifestVersion": 2,
+  "id": "helpdesk",
+  "name": "DreamDesk",
+  "version": "0.1.0",
+  "description": "One attention queue for Orca agents, Slack and Linear: a shield while you focus, a router when you are free.",
+  "engines": {
+    "orca": ">=1.4.259"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "helpdesk",
+        "title": "DreamDesk",
+        "icon": "bell",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "events": [
+      {
+        "on": "agent.status.changed"
+      }
+    ],
+    "commands": [
+      {
+        "id": "helpdesk.ack",
+        "title": "DreamDesk: mark alert as seen"
+      },
+      {
+        "id": "helpdesk.setupCollector",
+        "title": "DreamDesk: set up the Slack/Linear collector"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "helpdesk",
+        "text": "DreamDesk",
+        "icon": "bell",
+        "command": "helpdesk.ack"
+      }
+    ],
+    "settings": [
+      {
+        "key": "teamChannels",
+        "title": "Team channels",
+        "type": "string",
+        "multiline": true,
+        "default": "",
+        "description": "Slack channels shown in the TEAM section, one per line: the channel ID, then a label. Find the ID in Slack: channel name → About → bottom of the panel.",
+        "placeholder": "C0123ABCD #my-team\nC0456EFGH Lunch crew"
+      },
+      {
+        "key": "incidentChannels",
+        "title": "Incident channels",
+        "type": "string",
+        "default": "",
+        "description": "Comma-separated Slack channel names where production incidents are reported. The collector raises incidents there as urgent.",
+        "placeholder": "#engineering, #ops"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "agent:read"
+    },
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "workspace:write"
+    },
+    {
+      "kind": "notifications:show"
+    },
+    {
+      "kind": "secrets:own"
+    },
+    {
+      "kind": "settings:own"
+    },
+    {
+      "kind": "automation:read"
+    },
+    {
+      "kind": "automation:write"
+    }
+  ]
+}
