@@ -215,3 +215,13 @@ test('a Slack thread in progress can wait for the reply', async () => {
   assert.ok(calls.some((c) => JSON.stringify(c) === JSON.stringify({ action: 'await_reply', id: 'c' })))
   await view.unmount()
 })
+
+test('relaxing folds the queue away and offers to get back to work', async () => {
+  const calls: unknown[] = []
+  const view = await mount(panel, { host: hostWith({ ...free, focus: { itemId: null, since: 1, relax: true } }, calls) })
+  const tree = JSON.stringify(view.tree())
+  assert.ok(tree.includes('Queue hidden while you relax (2)'))
+  await view.press({ text: 'Back to work' })
+  assert.deepEqual(calls, [{ action: 'release' }])
+  await view.unmount()
+})

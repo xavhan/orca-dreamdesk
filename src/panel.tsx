@@ -662,6 +662,31 @@ function Channels({ tabs }: { tabs: TeamTab[] }) {
   )
 }
 
+/** The queue below the hero card, then the parked items. */
+function Queue({ v, queued }: { v: View; queued: Item[] }) {
+  return (
+    <Stack gap="lg">
+      {queued.length ? (
+        <Stack gap="sm">
+          <Row justify="between" align="center" wrap>
+            <Text size="xs" weight="semibold" muted>{v.focus ? 'QUEUED (SHIELD UP)' : 'UP NEXT'}</Text>
+            <Legend />
+          </Row>
+          {queued.map((i) => <QueueRow item={i} />)}
+        </Stack>
+      ) : null}
+
+      {v.parked.length ? (
+        <Collapsible title={`Parked (${v.parked.length})`}>
+          <Stack gap="sm">
+            {v.parked.map((i) => <QueueRow item={i} badge={i.delegatedTo?.startsWith('ws:') ? 'Waiting on worktree' : i.delegatedTo === AWAIT_REPLY ? 'Waiting for reply' : i.state === 'delegated' ? 'Delegated' : 'Snoozed'} />)}
+          </Stack>
+        </Collapsible>
+      ) : null}
+    </Stack>
+  )
+}
+
 // ---- panel ---------------------------------------------------------------
 
 export default function Panel() {
@@ -738,24 +763,16 @@ export default function Panel() {
           </Stack>
         ) : null}
 
-        {queued.length ? (
-          <Stack gap="sm">
-            <Row justify="between" align="center" wrap>
-              <Text size="xs" weight="semibold" muted>{v.focus ? 'QUEUED (SHIELD UP)' : 'UP NEXT'}</Text>
-              <Legend />
-            </Row>
-            {queued.map((i) => <QueueRow item={i} />)}
-          </Stack>
-        ) : null}
-
-        {v.parked.length ? (
-          <Collapsible title={`Parked (${v.parked.length})`}>
+        {v.focus?.relax ? (
+          // Panels have no blur: while relaxing, the queue folds away behind one closed line.
+          <Collapsible title={`Queue hidden while you relax (${v.next.length})`} description="Open it if you really want to look">
             <Stack gap="sm">
-              {v.parked.map((i) => <QueueRow item={i} badge={i.delegatedTo?.startsWith('ws:') ? 'Waiting on worktree' : i.delegatedTo === AWAIT_REPLY ? 'Waiting for reply' : i.state === 'delegated' ? 'Delegated' : 'Snoozed'} />)}
+              <Queue v={v} queued={queued} />
             </Stack>
           </Collapsible>
-        ) : null}
-
+        ) : (
+          <Queue v={v} queued={queued} />
+        )}
 
         {!v.slack ? (
           <Collapsible title="Connect Slack" description="To read threads and reply as you">
