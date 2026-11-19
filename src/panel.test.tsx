@@ -99,11 +99,11 @@ test('team channel shows messages and posts to it', async () => {
   await view.unmount()
 })
 
-test('dismiss removes the next item', async () => {
+test('done closes the next item', async () => {
   const calls: unknown[] = []
   const view = await mount(panel, { host: hostWith(free, calls) })
-  await view.press({ text: 'Dismiss' })
-  assert.deepEqual(calls, [{ action: 'pass', id: 'a' }])
+  await view.press({ text: 'Done' })
+  assert.deepEqual(calls, [{ action: 'done', id: 'a' }])
   await view.unmount()
 })
 
@@ -201,7 +201,7 @@ test("an agent's offered answers replace Done and send the chosen one", async ()
   const calls: unknown[] = []
   const current = item('c', { state: 'in_progress', source: 'agent', terminalId: 'term_1', actions: ['Yes, open the PR', 'No'] })
   const view = await mount(panel, { host: hostWith({ ...free, focus: { itemId: 'c', since: 1 }, current }, calls) })
-  assert.ok(!JSON.stringify(view.tree()).includes('"Done"'))
+  assert.ok(!JSON.stringify(view.tree()).includes('["Done"]'))
   await view.press({ text: 'Yes, open the PR' })
   assert.deepEqual(calls, [{ action: 'answer', id: 'c', answer: 'Yes, open the PR' }])
   await view.unmount()

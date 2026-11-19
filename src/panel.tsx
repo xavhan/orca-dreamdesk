@@ -351,7 +351,7 @@ function QueueRow({ item, badge }: { item: Item; badge?: string }) {
       <People item={item} names={false} max={2} />
       {badge ? <Badge>{badge}</Badge> : <Priority item={item} />}
       <WorktreeChip item={item} compact />
-      <IconButton icon="close" label={`Dismiss ${item.title}`} tooltip="Dismiss: not relevant to me" size="sm" variant="ghost" onPress={() => act('pass', { id: item.id })} />
+      <IconButton icon="check" label={`Done: ${item.title}`} tooltip="Done" size="sm" variant="ghost" onPress={() => act('done', { id: item.id })} />
       <IconButton icon="play" label={`Take ${item.title}`} tooltip="Take" size="sm" tone="accent" onPress={() => take(item)} />
     </Box>
   )
@@ -454,7 +454,6 @@ function Current({ item, since }: { item: Item; since: number }) {
           {item.url && item.source !== 'slack' ? <IconButton icon="open-external" label="Open" tooltip="Open" size="sm" variant="ghost" onPress={() => shell.openExternal(item.url!)} /> : null}
           {item.terminalId ? <IconButton icon="terminal" label="Open terminal" tooltip="Open terminal" size="sm" variant="ghost" onPress={() => plugin.request('item.open', { id: item.id })} /> : null}
           <IconButton icon="pause" label="Back to queue" tooltip="Back to queue" size="sm" variant="ghost" onPress={() => act('release')} />
-          <IconButton icon="close" label="Dismiss" tooltip="Dismiss: not relevant to me" size="sm" variant="ghost" onPress={() => act('pass', { id: item.id })} />
           <MoreMenu item={item} />
         </Row>
       </Row>
@@ -715,7 +714,7 @@ export default function Panel() {
                 <Row gap="xs">
                   <Button variant="solid" tone={first.kind === 'urgent' ? 'danger' : 'accent'} icon="play" onPress={() => take(first)}>Take it</Button>
                   {rest.length ? <Button variant="ghost" icon="next" tooltip="Send it to the bottom of the queue" onPress={() => act('sink', { id: first.id })}>Move to bottom</Button> : null}
-                  <Button variant="ghost" icon="close" tooltip="Not relevant to me" onPress={() => act('pass', { id: first.id })}>Dismiss</Button>
+                  <Button variant="ghost" icon="check" onPress={() => act('done', { id: first.id })}>Done</Button>
                 </Row>
               </Hero>
             ) : (
