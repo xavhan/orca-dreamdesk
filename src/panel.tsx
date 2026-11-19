@@ -301,6 +301,7 @@ function QueueRow({ item, badge }: { item: Item; badge?: string }) {
       </Box>
       <People item={item} names={false} max={2} />
       {badge ? <Badge>{badge}</Badge> : <Priority item={item} />}
+      {read(view)?.here === item.id ? <Badge tone="accent">You're here</Badge> : null}
       <WorktreeChip item={item} compact />
       <IconButton icon="close" label={`Dismiss ${item.title}`} tooltip="Dismiss: not relevant to me" size="sm" variant="ghost" onPress={() => act('pass', { id: item.id })} />
       <IconButton icon="play" label={`Take ${item.title}`} tooltip="Take" size="sm" tone="accent" onPress={() => take(item)} />

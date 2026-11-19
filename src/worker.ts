@@ -92,6 +92,8 @@ export default function activate(orca: OrcaWorkerApi): void {
   const channelMsgs: Record<string, Q.Msg[]> = {}
   /** Threads opened as tabs, persisted; their messages are kept in `channelMsgs` by tab id. */
   let pinned: { channel: string; ts: string; title: string }[] = []
+  /** The workspace focused in Orca, from `workspace.changed`. */
+  let focusedWs: { workspaceId?: string; displayName: string } | null = null
   let dms: { channel: string; name: string }[] = []
   const tabId = (t: { channel: string; ts: string }) => `${t.channel}:${t.ts}`
   /** Collector names (Linear people) → avatar file, filled from the Slack directory. */
@@ -191,6 +193,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       {
         worktrees,
         calendar: !!calendar,
+        ...(here() ? { here: here() } : {}),
         // Only for the item it was polled for: focus may have moved since.
         ...(ci && ci.itemId === q.focus?.itemId ? { ci: { state: ci.state, url: ci.url } } : {}),
         ...(PERMACONF ? { permaconf: PERMACONF } : {}),
@@ -427,6 +430,18 @@ export default function activate(orca: OrcaWorkerApi): void {
       orca.log(`agents: listing failed (${String(err)})`)
     }
     return rows
+  }
+
+  orca.events.on('workspace.changed', ({ context }) => {
+    focusedWs = context
+    orca.panels.post('queue.changed', view())
+  })
+  /** The open item whose linked worktree is focused in Orca, unless it is the current one. Matched by
+   *  name too: the event gives an `identity:` id, not the `repo::path` id that workspace.list gives. */
+  function here(): string | undefined {
+    if (!focusedWs) return undefined
+    const id = Object.entries(worktrees).find(([, w]) => w.id === focusedWs!.workspaceId || w.name === focusedWs!.displayName)?.[0]
+    return id && id !== q.focus?.itemId ? id : undefined
   }
 
   orca.events.on('agent.status.changed', async (ev) => {
