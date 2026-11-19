@@ -11,12 +11,12 @@ Nothing personal is stored in the code. Each person connects their own accounts.
 ## Install
 
 ```sh
-git clone <this repo> dreamdesk && cd dreamdesk
+git clone https://github.com/xavhan/orca-dreamdesk.git && cd orca-dreamdesk
 orca plugin dev load .          # Orca lists the access it asks for; approve it
-orca plugin open local.dreamdesk --panel helpdesk
+orca plugin open local.helpdesk --panel helpdesk
 ```
 
-(The plugin key follows the folder name. `orca plugin list` shows it.)
+(`local.helpdesk` is the plugin key, from the manifest `id`. `orca plugin list` shows it.)
 
 ## Set up (5 minutes)
 
