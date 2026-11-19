@@ -206,3 +206,12 @@ test("an agent's offered answers replace Done and send the chosen one", async ()
   assert.deepEqual(calls, [{ action: 'answer', id: 'c', answer: 'Yes, open the PR' }])
   await view.unmount()
 })
+
+test('a Slack thread in progress can wait for the reply', async () => {
+  const calls: unknown[] = []
+  const current = item('c', { state: 'in_progress', source: 'slack', thread: [{ who: 'Ana', text: 'q?', ts: '1.0', mine: false }] })
+  const view = await mount(panel, { host: hostWith({ ...free, focus: { itemId: 'c', since: 1 }, current }, calls) })
+  await view.press({ text: 'Wait for reply' })
+  assert.ok(calls.some((c) => JSON.stringify(c) === JSON.stringify({ action: 'await_reply', id: 'c' })))
+  await view.unmount()
+})

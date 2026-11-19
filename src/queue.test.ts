@@ -265,3 +265,18 @@ test('applyRequest: an agent request can offer up to 3 short answers, only with 
   assert.equal(add({ actions: ['Yes'] }).actions, undefined)
   assert.equal(add({ terminalId: 'rm -rf /', actions: ['Yes'] }).actions, undefined)
 })
+
+test('awaitReply parks a Slack item until someone else posts in its thread', () => {
+  const id = 'slack:C1:1.0'
+  let q = Q.ingest(Q.emptyQueue(), [{ source: 'slack', originId: 'C1:1.0', type: 'mention', urgent: false, title: 't', summary: '', at: 1 }], 1)
+  q = Q.threadUpdate(q, id, [{ who: 'Ana', text: 'q?', ts: '1.0', mine: false }], 2)
+  q = Q.take(q, id, 3)
+  q = Q.takeNext(Q.awaitReply(q, id), 4)
+  assert.equal(q.items[id]!.state, 'delegated')
+  assert.equal(q.focus, null)
+  q = Q.threadUpdate(q, id, [{ who: 'Ana', text: 'q?', ts: '1.0', mine: false }, { who: 'me', text: 'a', ts: '2.0', mine: true }], 5)
+  assert.equal(q.items[id]!.state, 'delegated')
+  q = Q.threadUpdate(q, id, [{ who: 'me', text: 'a', ts: '2.0', mine: true }, { who: 'Ana', text: 'ok', ts: '3.0', mine: false }], 6)
+  assert.equal(q.items[id]!.state, 'new')
+  assert.equal(q.items[id]!.delegatedTo, undefined)
+})

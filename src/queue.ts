@@ -308,7 +308,16 @@ export function watchedSlack(q: Queue, now: number): Item[] {
   return Object.values(q.items).filter((i) => i.source === 'slack' && i.state !== 'passed' && (i.state !== 'done' || now - i.arrivedAt < window))
 }
 
-/** Stores the latest thread messages. A new message from someone else reopens a done item. */
+/** `delegatedTo` of a Slack item parked until someone answers in its thread. */
+export const AWAIT_REPLY = 'slack:reply'
+
+/** Park a Slack item until someone else posts in its thread (`threadUpdate` brings it back). */
+export function awaitReply(q: Queue, id: string): Queue {
+  return leave(q, id, { state: 'delegated', delegatedTo: AWAIT_REPLY })
+}
+
+/** Stores the latest thread messages. A new message from someone else reopens a done item, or one
+ *  parked awaiting their reply. */
 export function threadUpdate(q: Queue, id: string, msgs: readonly Msg[], now: number): Queue {
   const item = q.items[id]
   if (!item || !msgs.length) return q
@@ -316,6 +325,7 @@ export function threadUpdate(q: Queue, id: string, msgs: readonly Msg[], now: nu
   const fresh = item.seenTs ? msgs.some((m) => !m.mine && Number(m.ts) > Number(item.seenTs)) : false
   const changes: Partial<Item> = { thread: msgs.slice(-5), seenTs: newest }
   if (fresh && item.state === 'done') Object.assign(changes, { state: 'new', arrivedAt: now })
+  if (fresh && item.delegatedTo === AWAIT_REPLY) Object.assign(changes, { state: 'new', arrivedAt: now, delegatedTo: undefined, reason: 'They replied in the thread.' })
   return patch(q, id, changes)
 }
 

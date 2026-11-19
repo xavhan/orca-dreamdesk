@@ -638,6 +638,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       case 'done': return commit(Q.done(q, need(id, 'id')))
       case 'pass': return commit(Q.pass(q, need(id, 'id')))
       case 'sink': return commit(Q.sink(q, need(id, 'id'), now))
+      case 'await_reply': return commit(Q.takeNext(Q.awaitReply(q, need(id, 'id')), now))
       case 'answer': {
         // Only an answer the agent offered, typed into the agent's own terminal.
         const item = q.items[need(id, 'id')]

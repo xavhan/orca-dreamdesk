@@ -30,7 +30,7 @@ import {
   type PanelContext
 } from 'orca'
 import type { Action, AgentRow, View } from './protocol'
-import { importance, threadLink, type Item, type Msg } from './queue'
+import { AWAIT_REPLY, importance, threadLink, type Item, type Msg } from './queue'
 import { segments } from './calendar'
 
 const view = atom<View | null>(null)
@@ -126,7 +126,9 @@ function involved(item: Item, max = 4): [string, string | undefined][] {
   const avatars = read(view)?.avatars ?? {}
   const seen = new Map<string, string | undefined>()
   for (const m of item.thread ?? []) if (!m.mine && !seen.has(m.who)) seen.set(m.who, m.avatar)
-  for (const name of item.people ?? []) if (!seen.has(name)) seen.set(name, avatars[name])
+  // The collector gives full names; Slack may give a display name ("Jean" vs "Jean Dessane"): one person.
+  const first = (n: string) => n.toLowerCase().split(/\s+/)[0]
+  for (const name of item.people ?? []) if (![...seen.keys()].some((k) => first(k) === first(name))) seen.set(name, avatars[name])
   return [...seen].slice(0, max)
 }
 
@@ -437,6 +439,9 @@ function Current({ item, since }: { item: Item; since: number }) {
           ) : (
             <Button variant="solid" tone="success" icon="check" onPress={() => act('done', { id: item.id })}>Done</Button>
           )}
+          {item.source === 'slack' && item.thread?.length ? (
+            <Button variant="outline" tone="accent" icon="pause" tooltip="Park it until someone else answers in the thread, and take the next item" onPress={() => act('await_reply', { id: item.id })}>Wait for reply</Button>
+          ) : null}
           {item.prUrl ? (
             <Button variant="outline" icon="code" tooltip={`Open ${item.prUrl.replace('https://github.com/', '')} on GitHub`} onPress={() => shell.openExternal(item.prUrl!)}>Open PR</Button>
           ) : null}
@@ -745,7 +750,7 @@ export default function Panel() {
         {v.parked.length ? (
           <Collapsible title={`Parked (${v.parked.length})`}>
             <Stack gap="sm">
-              {v.parked.map((i) => <QueueRow item={i} badge={i.delegatedTo?.startsWith('ws:') ? 'Waiting on worktree' : i.state === 'delegated' ? 'Delegated' : 'Snoozed'} />)}
+              {v.parked.map((i) => <QueueRow item={i} badge={i.delegatedTo?.startsWith('ws:') ? 'Waiting on worktree' : i.delegatedTo === AWAIT_REPLY ? 'Waiting for reply' : i.state === 'delegated' ? 'Delegated' : 'Snoozed'} />)}
             </Stack>
           </Collapsible>
         ) : null}
