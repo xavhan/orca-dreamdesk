@@ -762,7 +762,7 @@ export default function Panel() {
                   onSubmit={(t) => startTask(t)}
                 />
               </Box>
-              <Button variant="outline" icon="add" disabled={!read(taskDraft).trim()} onPress={() => startTask(read(taskDraft))}>Start</Button>
+              <Button size="md" variant="outline" icon="add" disabled={!read(taskDraft).trim()} onPress={() => startTask(read(taskDraft))}>Start</Button>
             </Row>
           </Box>
         ) : null}
