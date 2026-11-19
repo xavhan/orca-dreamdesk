@@ -71,11 +71,13 @@ export default function activate(orca: OrcaWorkerApi): void {
   let q: Q.Queue = Q.emptyQueue()
   let blink = false
   let CHANNELS: { id: string; name: string }[] = []
+  let PERMACONF = ''
 
   /** Reads settings; also writes what the collector agent needs to ~/.orca-helpdesk/config.json. */
   async function loadSettings(): Promise<void> {
     const s = await orca.settings.get().catch(() => ({}) as Record<string, unknown>)
     CHANNELS = parseChannels(String(s.teamChannels ?? ''))
+    PERMACONF = String(s.permaconfUrl ?? '').trim()
     const incidentChannels = String(s.incidentChannels ?? '').split(',').map((c) => c.trim()).filter(Boolean)
     try {
       mkdirSync(HOME, { recursive: true })
@@ -84,7 +86,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       orca.log(`settings: ${String(err)}`)
     }
   }
-  orca.settings.onDidChange(() => void loadSettings().then(pollChannel))
+  orca.settings.onDidChange(() => void loadSettings().then(pollChannel).then(() => orca.panels.post('queue.changed', view())))
 
   let slack: { token: string; me: string; url: string; who: ReturnType<typeof Slack.people> } | null = null
   const channelMsgs: Record<string, Q.Msg[]> = {}
@@ -188,6 +190,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       {
         worktrees,
         calendar: !!calendar,
+        ...(PERMACONF ? { permaconf: PERMACONF } : {}),
         nowAt: Date.now(),
         meetings: meetings(Date.now()),
         ...(slack

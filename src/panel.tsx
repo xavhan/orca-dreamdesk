@@ -416,7 +416,12 @@ function Meetings({ v }: { v: View }) {
     <Stack gap="xs">
       <Row justify="between" align="center">
         <Text size="xs" weight="semibold" muted>TODAY</Text>
-        <Text size="xs" muted>{all.length ? `${done} done · ${left.length} left` : 'No meetings today'}</Text>
+        <Row gap="xs" align="center">
+          <Text size="xs" muted>{all.length ? `${done} done · ${left.length} left` : 'No meetings today'}</Text>
+          {v.permaconf ? (
+            <Button size="xs" variant="ghost" tone="accent" icon="play" tooltip="Join the permaconf" onPress={() => shell.openExternal(v.permaconf!)}>Permaconf</Button>
+          ) : null}
+        </Row>
       </Row>
       {/* One bar for the day, made of native progress bars (the only fill that shows in every
           theme): free stretches and meetings, each filled by how much of it has passed. */}

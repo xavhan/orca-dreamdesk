@@ -18,6 +18,8 @@ export interface View {
   channels?: Tab[]
   /** Whether a calendar feed is connected, and today's meetings with where they stand now. */
   calendar?: boolean
+  /** The team's standing meeting link (`permaconfUrl` setting). */
+  permaconf?: string
   /** When the worker built this view; the timeline's "now". */
   nowAt?: number
   meetings?: (Meeting & { status: 'past' | 'now' | 'upcoming' })[]

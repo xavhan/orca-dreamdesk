@@ -60,6 +60,14 @@
         "default": "",
         "description": "Comma-separated Slack channel names where production incidents are reported. The collector raises incidents there as urgent.",
         "placeholder": "#engineering, #ops"
+      },
+      {
+        "key": "permaconfUrl",
+        "title": "Permaconf link",
+        "type": "string",
+        "default": "",
+        "description": "Your team's standing meeting link. Shown as a button above the calendar.",
+        "placeholder": "https://meet.google.com/abc-defg-hij"
       }
     ]
   },
