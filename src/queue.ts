@@ -275,6 +275,13 @@ export function takeNext(q: Queue, now: number): Queue {
   return next ? take(q, next.id, now) : q
 }
 
+/** Notes a task of the user's own and makes it the current one. */
+export function start(q: Queue, title: string, now: number): Queue {
+  const next = applyRequest(q, { op: 'add', from: 'me', title }, now)
+  const id = Object.keys(next.items).find((k) => !q.items[k])!
+  return take(next, id, now)
+}
+
 /** Lunch break or end of the day: shield up, no notifications, until `release`. */
 export function relax(q: Queue, now: number): Queue {
   return { ...endCurrent(q), focus: { itemId: null, since: now, relax: true } }

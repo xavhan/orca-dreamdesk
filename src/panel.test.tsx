@@ -225,3 +225,11 @@ test('relaxing folds the queue away and offers to get back to work', async () =>
   assert.deepEqual(calls, [{ action: 'release' }])
   await view.unmount()
 })
+
+test('on something else, typing a task starts it', async () => {
+  const calls: unknown[] = []
+  const view = await mount(panel, { host: hostWith({ ...free, focus: { itemId: null, since: 1 } }, calls) })
+  await view.type({ label: 'What are you working on?' }, 'Prepare the demo', { submit: true })
+  assert.ok(calls.some((c) => JSON.stringify(c) === JSON.stringify({ action: 'start', title: 'Prepare the demo' })))
+  await view.unmount()
+})

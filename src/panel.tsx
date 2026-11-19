@@ -46,7 +46,7 @@ const SOURCE: Record<Item['source'], string> = { agent: 'Agent', slack: 'Slack',
 
 // ---- actions -------------------------------------------------------------
 
-async function act(action: Action, extra: { id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string; answer?: string } = {}) {
+async function act(action: Action, extra: { id?: string; choice?: '30m' | '2h' | 'tomorrow'; terminalId?: string; answer?: string; title?: string } = {}) {
   set(view, await plugin.request('queue.act', { action, ...extra }))
 }
 
@@ -662,6 +662,14 @@ function Channels({ tabs }: { tabs: TeamTab[] }) {
   )
 }
 
+const taskDraft = atom('')
+/** Notes what the user is doing as a task of their own and makes it current. */
+function startTask(title: string) {
+  if (!title.trim()) return
+  set(taskDraft, '')
+  void act('start', { title: title.trim() })
+}
+
 /** The queue below the hero card, then the parked items. */
 function Queue({ v, queued }: { v: View; queued: Item[] }) {
   return (
@@ -741,6 +749,21 @@ export default function Panel() {
             <Box grow />
             <Button size="sm" variant="outline" icon="check" tooltip="Back to the queue" onPress={() => act('release')}>I'm done</Button>
           </Box>
+        ) : null}
+        {v.focus && !v.current && !v.focus.relax ? (
+          <Row gap="xs" align="end">
+            <Box grow>
+              <Input
+                label="What are you working on?"
+                labelHidden
+                placeholder="What are you working on? It becomes your current task"
+                value={read(taskDraft)}
+                onChange={(t) => set(taskDraft, t)}
+                onSubmit={(t) => startTask(t)}
+              />
+            </Box>
+            <Button variant="outline" icon="add" disabled={!read(taskDraft).trim()} onPress={() => startTask(read(taskDraft))}>Start</Button>
+          </Row>
         ) : null}
 
         {!v.focus ? (

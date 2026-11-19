@@ -288,3 +288,12 @@ test('relax ends the current item and back to work releases it', () => {
   assert.equal(q.items['linear:A-1']!.state, 'new')
   assert.equal(Q.release(q).focus, null)
 })
+
+test('start notes a task of my own and makes it current', () => {
+  const q = Q.start(Q.focusOther(Q.emptyQueue(), 1), 'Prepare the demo', 2)
+  const cur = q.items[q.focus!.itemId!]!
+  assert.equal(cur.title, 'Prepare the demo')
+  assert.equal(cur.source, 'me')
+  assert.equal(cur.state, 'in_progress')
+  assert.throws(() => Q.start(Q.emptyQueue(), '  ', 1))
+})

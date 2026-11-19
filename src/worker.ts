@@ -627,7 +627,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     return view()
   })
 
-  orca.panels.handle('queue.act', async ({ action, id, choice, terminalId, answer }) => {
+  orca.panels.handle('queue.act', async ({ action, id, choice, terminalId, answer, title }) => {
     await ready
     const now = Date.now()
     const need = (v: string | undefined, name: string): string => {
@@ -659,6 +659,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       case 'delegate': return commit(Q.takeNext(Q.delegate(q, need(id, 'id'), need(terminalId, 'terminalId')), now))
       case 'other': return commit(Q.focusOther(q, now))
       case 'relax': return commit(Q.relax(q, now))
+      case 'start': return commit(Q.start(q, need(title, 'title'), now))
       case 'release': return commit(Q.release(q))
       case 'ack': return commit(Q.ack(q))
     }
