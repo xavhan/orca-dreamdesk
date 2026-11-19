@@ -1,7 +1,7 @@
 // Wires the pure queue (src/queue.ts) to Orca: agent events, the collector's inbox files,
 // storage, the status bar and notifications.
 import type { OrcaWorkerApi } from 'orca/worker'
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +15,9 @@ import { todaysMeetings, withAuthUser } from './calendar'
 // Tests point HELPDESK_INBOX at a temp dir; everything else in ~/.orca-helpdesk follows it.
 export const INBOX = process.env.HELPDESK_INBOX ?? join(homedir(), '.orca-helpdesk', 'inbox')
 export const HOME = dirname(INBOX)
+/** The MCP server (mcp/server.mjs) reads the queue here and drops requests in REQUESTS. */
+export const SNAPSHOT = join(HOME, 'queue.json')
+export const REQUESTS = join(HOME, 'requests')
 const KEY = 'queue'
 // Avatars must be files inside the plugin folder: panels cannot load URLs. Gitignored.
 const AVATARS = fileURLToPath(new URL('../avatars/', import.meta.url))
@@ -308,6 +311,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     // Round-trip through JSON: storage refuses `undefined` fields.
     const focusMoved = next.focus?.itemId !== q.focus?.itemId
     q = JSON.parse(JSON.stringify(Q.prune(next, Date.now())))
+    writeSnapshot()
     if (focusMoved) void pollCi()
     await orca.storage.set(KEY, q as never)
     const v = view()
@@ -388,6 +392,53 @@ export default function activate(orca: OrcaWorkerApi): void {
       ci = next
       orca.panels.post('queue.changed', view())
     }
+  }
+
+  /** What the MCP server shows other agents: open items, with their linked worktree. */
+  function writeSnapshot(): void {
+    try {
+      const now = Date.now()
+      const row = (i: Q.Item) => ({
+        id: i.id, title: i.title, summary: i.summary, source: i.source, state: i.state, importance: Q.importance(i),
+        ...(i.url ? { url: i.url } : {}), ...(i.prUrl ? { prUrl: i.prUrl } : {}),
+        ...(worktrees[i.id] ? { worktree: worktrees[i.id]!.name } : {})
+      })
+      const id = q.focus?.itemId
+      const snap = { at: now, current: id && q.items[id] ? row(q.items[id]!) : null, queue: Q.rank(q, now).map(row), parked: Q.parked(q, now).map(row) }
+      mkdirSync(HOME, { recursive: true })
+      writeFileSync(`${SNAPSHOT}.tmp`, JSON.stringify(snap, null, 2))
+      renameSync(`${SNAPSHOT}.tmp`, SNAPSHOT)
+    } catch (err) {
+      orca.log(`snapshot: ${String(err)}`)
+    }
+  }
+
+  /** Applies the MCP server's request files in order, then deletes them (the server waits for that). */
+  let applying = Promise.resolve()
+  const applyRequests = () =>
+    (applying = applying.then(async () => {
+      await ready
+      mkdirSync(REQUESTS, { recursive: true })
+      const files = readdirSync(REQUESTS).filter((n) => n.endsWith('.json')).sort()
+      if (!files.length) return
+      let next = q
+      for (const name of files) {
+        try {
+          next = Q.applyRequest(next, JSON.parse(readFileSync(join(REQUESTS, name), 'utf8')), Date.now())
+        } catch (err) {
+          orca.log(`requests: ${name} ${String(err).slice(0, 200)}`)
+          writeFileSync(join(REQUESTS, `${name}.error`), String(err))
+        }
+        rmSync(join(REQUESTS, name), { force: true })
+      }
+      await commit(next)
+    }).catch((err) => orca.log(`requests: ${String(err)}`)))
+  try {
+    mkdirSync(REQUESTS, { recursive: true })
+    const watcher = watch(REQUESTS, () => void applyRequests())
+    deactivateHooks.push(() => watcher.close())
+  } catch (err) {
+    orca.log(`requests: watch ${String(err)}`)
   }
 
   async function ingestInbox(): Promise<void> {
@@ -615,7 +666,7 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   // The status bar item keeps this worker alive, so plain timers are enough.
   const tick = setInterval(
-    () => void ingestInbox().then(pollThreads).then(pollChannel).then(pollPrs).then(pollWorktrees).then(pollCi).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
+    () => void applyRequests().then(ingestInbox).then(pollThreads).then(pollChannel).then(pollPrs).then(pollWorktrees).then(pollCi).then(pollCalendar).catch((e) => orca.log(`tick: ${String(e)}`)),
     60_000
   )
   const blinker = setInterval(() => {

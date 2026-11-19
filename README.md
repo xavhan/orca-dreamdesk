@@ -44,3 +44,14 @@ orca plugin check .    # renders the panel scenarios
 - `src/panel.tsx`: the panel
 - `src/slack.ts`, `src/calendar.ts`: Slack Web API client, iCal parsing
 - `collector/prompt.md`: the collector automation's prompt
+
+## MCP server: DreamDesk from other agents
+
+`mcp/server.mjs` lets agents in other worktrees read the queue and act on it. It is plain Node with no dependencies. It reads `~/.orca-helpdesk/queue.json`, which the worker keeps up to date, and drops requests in `~/.orca-helpdesk/requests/`, which the worker applies at once.
+
+```sh
+claude mcp add --scope user dreamdesk -- node /path/to/orca-helpdesk/mcp/server.mjs
+codex mcp add dreamdesk -- node /path/to/orca-helpdesk/mcp/server.mjs
+```
+
+Tools: `dreamdesk_queue` (current item, queue, parked, each with its linked worktree), `dreamdesk_add`, `dreamdesk_done`, `dreamdesk_snooze`, `dreamdesk_set_pr`.

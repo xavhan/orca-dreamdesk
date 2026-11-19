@@ -305,6 +305,58 @@ export function threadUpdate(q: Queue, id: string, msgs: readonly Msg[], now: nu
   return patch(q, id, changes)
 }
 
+/** A request another agent dropped in `~/.orca-helpdesk/requests/` through the DreamDesk MCP server. */
+export type Request =
+  | { op: 'add'; title: string; summary?: string; url?: string; prUrl?: string; importance?: number; urgent?: boolean }
+  | { op: 'done' | 'pass'; id: string }
+  | { op: 'snooze'; id: string; minutes: number }
+  | { op: 'set_pr'; id: string; prUrl: string }
+
+const str = (v: unknown, max = 2000) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined)
+const prLink = (v: unknown) => (typeof v === 'string' && /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(v) ? v : undefined)
+
+/** Applies one request. Anything malformed or naming an unknown item throws, so the worker logs it. */
+export function applyRequest(q: Queue, raw: unknown, now: number): Queue {
+  const r = (raw ?? {}) as Record<string, unknown>
+  if (r.op === 'add') {
+    const title = str(r.title, 200)
+    if (!title) throw new Error('add: title required')
+    const urgent = r.urgent === true
+    const id = `agent:mcp:${now.toString(36)}:${Math.random().toString(36).slice(2, 6)}`
+    const q2 = put(q, {
+      id,
+      source: 'agent',
+      kind: urgent ? 'urgent' : 'mention',
+      title,
+      summary: str(r.summary) ?? '',
+      ...(str(r.url) ? { url: str(r.url) } : {}),
+      ...(prLink(r.prUrl) ? { prUrl: prLink(r.prUrl) } : {}),
+      ...([1, 2, 3, 4].includes(r.importance as number) ? { importance: r.importance as number } : {}),
+      reason: 'Added by an agent',
+      arrivedAt: now,
+      state: 'new'
+    })
+    return urgent ? { ...q2, alert: true } : q2
+  }
+  const id = str(r.id)
+  if (!id || !q.items[id]) throw new Error(`${String(r.op)}: unknown item ${String(r.id)}`)
+  switch (r.op) {
+    case 'done': return done(q, id)
+    case 'pass': return pass(q, id)
+    case 'snooze': {
+      const minutes = Number(r.minutes)
+      if (!(minutes > 0)) throw new Error('snooze: minutes must be positive')
+      return snooze(q, id, now + Math.min(minutes, 7 * 24 * 60) * 60_000)
+    }
+    case 'set_pr': {
+      const prUrl = prLink(r.prUrl)
+      if (!prUrl) throw new Error('set_pr: prUrl must be a github.com pull request URL')
+      return patch(q, id, { prUrl })
+    }
+    default: throw new Error(`unknown op ${String(r.op)}`)
+  }
+}
+
 /** What `gh pr view --json state,author,reviews` says, flattened. */
 export interface PrInfo {
   state: string

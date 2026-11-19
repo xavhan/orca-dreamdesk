@@ -202,3 +202,20 @@ test('ciState: failing beats running beats passed', () => {
   assert.equal(Q.ciState([{ status: 'IN_PROGRESS' }, { status: 'COMPLETED', conclusion: 'FAILURE' }]), 'failing')
   assert.equal(Q.ciState([{ state: 'ERROR' }]), 'failing')
 })
+
+test('applyRequest: agents add items and act on them; bad requests throw', () => {
+  let q = Q.applyRequest(Q.emptyQueue(), { op: 'add', title: 'Review my PR', importance: 1, prUrl: 'https://github.com/acme/app/pull/7' }, 1000)
+  const item = Object.values(q.items)[0]!
+  assert.equal(item.title, 'Review my PR')
+  assert.equal(item.prUrl, 'https://github.com/acme/app/pull/7')
+  assert.equal(q.alert, false)
+  q = Q.applyRequest(q, { op: 'snooze', id: item.id, minutes: 30 }, 1000)
+  assert.equal(q.items[item.id]!.snoozeUntil, 1000 + 30 * 60_000)
+  q = Q.applyRequest(q, { op: 'done', id: item.id }, 2000)
+  assert.equal(q.items[item.id]!.state, 'done')
+  assert.equal(Q.applyRequest(Q.emptyQueue(), { op: 'add', title: 'Prod down', urgent: true }, 1).alert, true)
+  assert.throws(() => Q.applyRequest(q, { op: 'done', id: 'nope' }, 1))
+  assert.throws(() => Q.applyRequest(q, { op: 'add' }, 1))
+  assert.throws(() => Q.applyRequest(q, { op: 'set_pr', id: item.id, prUrl: 'https://evil.example/pull/1' }, 1))
+  assert.throws(() => Q.applyRequest(q, { op: 'rm -rf' }, 1))
+})
