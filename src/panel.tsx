@@ -303,6 +303,25 @@ const BORDER = { need: 'danger', working: 'warning', waiting: 'warning', actiona
 // borders of those rows follow it.
 const blinkOn = atom(true)
 
+/** What the row borders mean (see BORDER); the "agent running" dot blinks like its rows. */
+function Legend() {
+  const dot = (tone: 'danger' | 'warning' | 'accent' | undefined, label: string, dim = false) => (
+    <Text size="xs" muted>
+      <Text size="xs" tone={dim ? undefined : tone} muted={!tone || dim}>●</Text>
+      {` ${label}`}
+    </Text>
+  )
+  return (
+    <Row gap="sm" align="center" wrap>
+      {dot('danger', 'Needs you')}
+      {dot('warning', 'Agent running', !read(blinkOn))}
+      {dot('warning', 'Waiting CI/review')}
+      {dot('accent', 'Actionable')}
+      {dot(undefined, 'Idle')}
+    </Row>
+  )
+}
+
 function QueueRow({ item, badge }: { item: Item; badge?: string }) {
   const v = read(view)
   const st = v?.status?.[item.id] ?? 'actionable'
@@ -699,7 +718,10 @@ export default function Panel() {
 
         {queued.length ? (
           <Stack gap="sm">
-            <Text size="xs" weight="semibold" muted>{v.focus ? 'QUEUED (SHIELD UP)' : 'UP NEXT'}</Text>
+            <Row justify="between" align="center" wrap>
+              <Text size="xs" weight="semibold" muted>{v.focus ? 'QUEUED (SHIELD UP)' : 'UP NEXT'}</Text>
+              <Legend />
+            </Row>
             {queued.map((i) => <QueueRow item={i} />)}
           </Stack>
         ) : null}
