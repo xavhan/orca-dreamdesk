@@ -515,10 +515,12 @@ export default function activate(orca: OrcaWorkerApi): void {
       case 'wait': {
         const wt = worktrees[need(id, 'id')]
         if (!wt) throw Object.assign(new Error('no linked worktree'), { code: 'invalid_params' })
-        return commit(Q.waitOnWorktree(q, id!, wt.id, wt.state))
+        // Fresh state: the minute-old one may still say "done" from before the user's last prompt.
+        const state = await agentState(wt.id, wt.state)
+        return commit(Q.takeNext(Q.waitOnWorktree(q, id!, wt.id, state), now))
       }
       case 'snooze': return commit(Q.snooze(q, need(id, 'id'), Q.snoozeUntil(choice ?? '30m', now)))
-      case 'delegate': return commit(Q.delegate(q, need(id, 'id'), need(terminalId, 'terminalId')))
+      case 'delegate': return commit(Q.takeNext(Q.delegate(q, need(id, 'id'), need(terminalId, 'terminalId')), now))
       case 'other': return commit(Q.focusOther(q, now))
       case 'release': return commit(Q.release(q))
       case 'ack': return commit(Q.ack(q))

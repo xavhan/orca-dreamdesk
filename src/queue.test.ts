@@ -182,3 +182,13 @@ test('ingest keeps the PR link across updates', () => {
   q = Q.ingest(q, [base], 2)
   assert.equal(q.items['linear:ENG-1']!.prUrl, 'https://github.com/acme/app/pull/1')
 })
+
+test('takeNext focuses the top item once the current one is in the background', () => {
+  const inc = (originId: string, importance: number) => ({ source: 'linear' as const, originId, type: 'ticket' as const, urgent: false, title: originId, summary: '', importance, at: 1 })
+  let q = Q.ingest(Q.emptyQueue(), [inc('A-1', 1), inc('A-2', 2), inc('A-3', 3)], 1)
+  q = Q.take(q, 'linear:A-1', 2)
+  q = Q.takeNext(Q.waitOnWorktree(q, 'linear:A-1', 'W1', 'working'), 3)
+  assert.equal(q.focus?.itemId, 'linear:A-2')
+  assert.equal(q.items['linear:A-1']!.state, 'delegated')
+  assert.equal(Q.takeNext(Q.emptyQueue(), 1).focus, null)
+})

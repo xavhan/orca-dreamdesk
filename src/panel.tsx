@@ -358,7 +358,7 @@ function Current({ item, since }: { item: Item; since: number }) {
             <Button variant="outline" icon="code" tooltip={`Open ${item.prUrl.replace('https://github.com/', '')} on GitHub`} onPress={() => shell.openExternal(item.prUrl!)}>Open PR</Button>
           ) : null}
           {hasWorktree ? (
-            <Button variant="outline" tone="accent" icon="branch" tooltip="Park it until the worktree agent needs you, and take the next item" onPress={() => act('wait', { id: item.id })}>Wait on worktree</Button>
+            <Button variant="outline" tone="accent" icon="branch" tooltip="Back to the queue once the worktree agent finishes or needs you; opens the next item now" onPress={() => act('wait', { id: item.id })}>Background</Button>
           ) : null}
         </Row>
         <Row gap="xs" align="center">

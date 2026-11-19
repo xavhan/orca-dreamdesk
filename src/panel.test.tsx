@@ -139,7 +139,7 @@ test('linked worktree shows its state and lets you wait on it', async () => {
   const v: View = { ...free, focus: { itemId: cur.id, since: 1 }, current: cur, worktrees: { 'linear:TC-1': { id: 'W1', name: 'tc-1-fix', state: 'working' } } }
   const view = await mount(panel, { host: hostWith(v, calls) })
   assert.ok(JSON.stringify(view.tree()).includes('tc-1-fix · agent working'))
-  await view.press({ text: 'Wait on worktree' })
+  await view.press({ text: 'Background' })
   assert.deepEqual(calls, [{ action: 'wait', id: 'linear:TC-1' }])
   await view.unmount()
 })

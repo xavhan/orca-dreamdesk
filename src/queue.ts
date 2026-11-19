@@ -254,6 +254,12 @@ export function worktreeStatus(q: Queue, workspaceId: string, status: string, no
   return q
 }
 
+/** Focus the top-ranked item, if any: after putting the current one in the background. */
+export function takeNext(q: Queue, now: number): Queue {
+  const next = rank(q, now)[0]
+  return next ? take(q, next.id, now) : q
+}
+
 export function focusOther(q: Queue, now: number): Queue {
   return { ...endCurrent(q), focus: { itemId: null, since: now } }
 }
