@@ -429,7 +429,7 @@ export function ciState(checks: readonly { status?: string; conclusion?: string;
   return 'passed'
 }
 
-/** What a row's border says: red needs you, orange blinking an agent works, orange waits on
+/** What a row's border says: red needs you, green blinking an agent works, orange waits on
  *  CI or a review, white is yours to act on, none is idle (info only, snoozed). */
 export type Status = 'need' | 'working' | 'waiting' | 'actionable' | 'idle'
 

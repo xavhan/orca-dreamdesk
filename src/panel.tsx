@@ -301,7 +301,7 @@ function Hero({ item, label, since, children }: { item: Item; label: string; sin
 
 /** A queued item as one compact row. */
 // Border tones per status. Orca has no blue tone: accent (white in a dark theme) marks actionable.
-const BORDER = { need: 'danger', working: 'warning', waiting: 'warning', actionable: 'accent', idle: true } as const
+const BORDER = { need: 'danger', working: 'success', waiting: 'warning', actionable: 'accent', idle: true } as const
 // Panels cannot animate: the worker sends `blink` every second while an agent works, and the
 // borders of those rows follow it.
 const blinkOn = atom(true)
@@ -314,7 +314,7 @@ function NeedsYou({ item }: { item: Item }) {
 
 /** What the row borders mean (see BORDER); the "agent running" dot blinks like its rows. */
 function Legend() {
-  const dot = (tone: 'danger' | 'warning' | 'accent' | undefined, label: string, dim = false) => (
+  const dot = (tone: 'danger' | 'warning' | 'success' | 'accent' | undefined, label: string, dim = false) => (
     <Text size="xs" muted>
       <Text size="xs" tone={dim ? undefined : tone} muted={!tone || dim}>●</Text>
       {` ${label}`}
@@ -323,7 +323,7 @@ function Legend() {
   return (
     <Row gap="sm" align="center" wrap>
       {dot('danger', 'Needs you')}
-      {dot('warning', 'Agent running', !read(blinkOn))}
+      {dot('success', 'Agent running', !read(blinkOn))}
       {dot('warning', 'Waiting CI/review')}
       {dot('accent', 'Actionable')}
       {dot(undefined, 'Idle')}
